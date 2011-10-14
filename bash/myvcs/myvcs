@@ -33,7 +33,7 @@ case $1 in
                 declare -i r=`cat ".$2/HEAD"`+1
                 mv ".$2/lastver" ".$2/prelastver.tmp"
                 cp $2 ".$2/lastver"
-                diff ".$2/lastver" ".$2/prelastver.tmp" > ".$2/diffto_$r"
+                diff ".$2/prelastver.tmp" ".$2/lastver" > ".$2/diffto_$r"
                 rm ".$2/prelastver.tmp"
                 
                 echo $r > ".$2/HEAD"
