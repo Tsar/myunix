@@ -1,0 +1,62 @@
+#!/bin/bash
+
+case $1 in
+    "init")
+        if [ -f $2 ]
+        then
+            if [ -a ".$2" ]
+            then
+                if [ -d ".$2" ]
+                then
+                    echo "ERROR: Repo already exists."
+                else
+                    echo "ERROR: Repo can not be created: there is something named \".$2\"."
+                fi
+            else
+                mkdir ".$2"
+                echo "INFO: Made an empty repo for \"$2\"."
+            fi
+        else
+            echo "ERROR: File \"$2\" doesn't exist! Can not init repo."
+        fi
+        ;;
+    "commit")
+        if [ -d ".$2" ]
+        then
+            if [ ! -f ".$2/HEAD" ]
+            then
+                echo "0" > ".$2/HEAD"
+                echo "0" > ".$2/CUR"
+                cp $2 ".$2/lastver"
+                echo "INFO: Committed at revision 0."
+            else
+                declare -i r=`cat ".$2/HEAD"`+1
+                mv ".$2/lastver" ".$2/prelastver.tmp"
+                cp $2 ".$2/lastver"
+                diff ".$2/lastver" ".$2/prelastver.tmp" > ".$2/diffto_$r"
+                rm ".$2/prelastver.tmp"
+                
+                echo $r > ".$2/HEAD"
+                echo $r > ".$2/CUR"
+                echo "INFO: Committed at revision $r."
+            fi
+        else
+            echo "ERROR: Repo for this file is not created."
+        fi
+        ;;
+    "diff")
+        if [ -d ".$2" ]
+        then
+            if [ -f ".$2/HEAD" ]
+            then
+                colordiff ".$2/lastver" $2
+            else
+                echo "ERROR: Nothing to compare with."
+            fi
+        else
+            echo "ERROR: Repo for this file is not created."
+        fi
+        ;;
+    *)
+        echo "ERROR: Unknown command."
+esac
