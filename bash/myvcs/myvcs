@@ -40,7 +40,7 @@ case $1 in
                 declare -i r=`cat ".$2/HEAD"`+1
                 mv ".$2/lastver" ".$2/prelastver.tmp"
                 cp $2 ".$2/lastver"
-                diff ".$2/prelastver.tmp" ".$2/lastver" > ".$2/diffto_$r"
+                diff ".$2/lastver" ".$2/prelastver.tmp" > ".$2/diffdownfrom_$r"
                 rm ".$2/prelastver.tmp"
                 
                 echo $r > ".$2/HEAD"
@@ -92,9 +92,28 @@ case $1 in
                 then
                     echo "ERROR: You should specify revision to update to."
                 else
-                    declare -i head=`cat ".$2/HEAD"`
-                    cp ".$2/lastver" $2
-                    echo "To be continued..." ##
+                    declare -i head_rev=`cat ".$2/HEAD"`
+                    declare -i need_rev=$3
+                    if [ "$need_rev" -gt "$head_rev" ]
+                    then
+                        echo "ERROR: You want to get a revision, that is greater than head (head is $head_rev)."
+                    else
+                        if [ "$need_rev" -lt 0 ]
+                        then
+                            echo "ERROR: You want to get a revision lower than 0."
+                        else
+                            cp ".$2/lastver" $2
+                            if [ "$need_rev" -lt "$head_rev" ]
+                            then
+                                declare -i lastpatchnum=$need_rev+1
+                                for i in `seq $head_rev -1 $lastpatchnum`
+                                do
+                                    patch $2 ".$2/diffdownfrom_$i" >/dev/null
+                                done
+                            fi
+                            echo "INFO: Updated to revision $need_rev. (Notice: head is $head_rev)"
+                        fi
+                    fi
                 fi
             else
                 echo "ERROR: There were no commits to this repo."
@@ -108,3 +127,4 @@ case $1 in
 esac
 
 exit 0
+
