@@ -55,7 +55,12 @@ case $1 in
         then
             if [ -f ".$2/HEAD" ]
             then
-                colordiff ".$2/lastver" $2
+                #if [ -x `which colordiff` ]
+                #then
+                #    colordiff ".$2/lastver" $2
+                #else
+                    diff ".$2/lastver" $2
+                #fi
             else
                 echo "ERROR: Nothing to compare with."
             fi
@@ -127,4 +132,3 @@ case $1 in
 esac
 
 exit 0
-
