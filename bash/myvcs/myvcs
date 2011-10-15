@@ -1,5 +1,13 @@
 #!/bin/bash
 
+ERR_NO_REPO="ERROR: Repo for this file is not created."
+
+if [ -z $2 ]
+then
+    echo "ERROR: You should specify a file."
+    exit 0
+fi
+
 case $1 in
     "init")
         if [ -f $2 ]
@@ -26,7 +34,6 @@ case $1 in
             if [ ! -f ".$2/HEAD" ]
             then
                 echo "0" > ".$2/HEAD"
-                echo "0" > ".$2/CUR"
                 cp $2 ".$2/lastver"
                 echo "INFO: Committed at revision 0."
             else
@@ -37,11 +44,10 @@ case $1 in
                 rm ".$2/prelastver.tmp"
                 
                 echo $r > ".$2/HEAD"
-                echo $r > ".$2/CUR"
                 echo "INFO: Committed at revision $r."
             fi
         else
-            echo "ERROR: Repo for this file is not created."
+            echo $ERR_NO_REPO
         fi
         ;;
     "diff")
@@ -54,9 +60,51 @@ case $1 in
                 echo "ERROR: Nothing to compare with."
             fi
         else
-            echo "ERROR: Repo for this file is not created."
+            echo $ERR_NO_REPO
+        fi
+        ;;
+    "status")
+        if [ -d ".$2" ]
+        then
+            if [ -f ".$2/HEAD" ]
+            then
+                if diff -q ".$2/lastver" $2 >/dev/null 2>&1
+                then
+                    echo "INFO: File did not change."
+                    exit 0
+                else
+                    echo "INFO: File has changed."
+                    exit 1
+                fi
+            else
+                echo "ERROR: Nothing to compare with."
+            fi
+        else
+            echo $ERR_NO_REPO
+        fi
+        ;;
+    "update")
+        if [ -d ".$2" ]
+        then
+            if [ -f ".$2/HEAD" ]
+            then
+                if [ -z $3 ]
+                then
+                    echo "ERROR: You should specify revision to update to."
+                else
+                    declare -i head=`cat ".$2/HEAD"`
+                    cp ".$2/lastver" $2
+                    echo "To be continued..." ##
+                fi
+            else
+                echo "ERROR: There were no commits to this repo."
+            fi
+        else
+            echo $ERR_NO_REPO
         fi
         ;;
     *)
         echo "ERROR: Unknown command."
 esac
+
+exit 0
