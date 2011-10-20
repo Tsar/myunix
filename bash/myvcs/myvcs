@@ -40,7 +40,7 @@ case $1 in
                 declare -i r=`cat ".$2/HEAD"`+1
                 mv ".$2/lastver" ".$2/prelastver.tmp"
                 cp $2 ".$2/lastver"
-                diff ".$2/lastver" ".$2/prelastver.tmp" > ".$2/diffdownfrom_$r"
+                diff -u ".$2/lastver" ".$2/prelastver.tmp" > ".$2/diffdownfrom_$r"
                 rm ".$2/prelastver.tmp"
                 
                 echo $r > ".$2/HEAD"
@@ -57,9 +57,9 @@ case $1 in
             then
                 #if [ -x `which colordiff` ]
                 #then
-                #    colordiff ".$2/lastver" $2
+                #    colordiff -u ".$2/lastver" $2
                 #else
-                    diff ".$2/lastver" $2
+                    diff -u ".$2/lastver" $2
                 #fi
             else
                 echo "ERROR: Nothing to compare with."
@@ -113,7 +113,7 @@ case $1 in
                                 declare -i lastpatchnum=$need_rev+1
                                 for i in `seq $head_rev -1 $lastpatchnum`
                                 do
-                                    patch $2 ".$2/diffdownfrom_$i" >/dev/null
+                                    patch -u $2 ".$2/diffdownfrom_$i" >/dev/null
                                 done
                             fi
                             echo "INFO: Updated to revision $need_rev. (Notice: head is $head_rev)"
