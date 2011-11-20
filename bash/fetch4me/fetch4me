@@ -11,8 +11,8 @@ ERRORS_ARRAY[$ERROR_INVALID_PARAMS_DIR_EXPECTED]="Invalid parameters: directory 
 ERRORS_ARRAY[$ERROR_INVALID_PARAMS_REFERER_EXPECTED]="Invalid parameters: referer expected after \"-r\""
 
 error() {
-    echo ${ERRORS_ARRAY[$1]}
-    echo $USAGE_INFO
+    echo ${ERRORS_ARRAY[$1]} >&2
+    echo $USAGE_INFO >&2
     exit 1
 }
 
@@ -35,7 +35,7 @@ do
     if [ $paramExpectedDir -eq 1 ]
     then
         paramExpectedDir=0
-        dir=$arg
+        qqedir=$arg
         continue
     fi
 
@@ -70,7 +70,7 @@ then
 fi
 
 #debug echoes
-echo $dir
+echo $qqedir
 echo $referer
 echo $urlsCount
 echo ${urls[0]}
