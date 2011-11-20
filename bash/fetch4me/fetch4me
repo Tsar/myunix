@@ -1,21 +1,80 @@
 #!/bin/bash -e
 
-MSG_USAGE="Usage: fetch4me [-w <dir>] [-r <referer>] (<url>)*"
+USAGE_INFO="Usage: fetch4me [-w <dir>] [-r <referer>] (<url>)*"
 
 ERROR_NO_PARAMS=0
-ERRORMSG_NO_PARAMS="No parameters given"
+ERROR_INVALID_PARAMS_DIR_EXPECTED=1
+ERROR_INVALID_PARAMS_REFERER_EXPECTED=2
+
+ERRORS_ARRAY[$ERROR_NO_PARAMS]="No parameters given"
+ERRORS_ARRAY[$ERROR_INVALID_PARAMS_DIR_EXPECTED]="Invalid parameters: directory expected after \"-w\""
+ERRORS_ARRAY[$ERROR_INVALID_PARAMS_REFERER_EXPECTED]="Invalid parameters: referer expected after \"-r\""
 
 error() {
-    case $1 in
-        $ERROR_NO_PARAMS)
-            echo $ERRORMSG_NO_PARAMS
-            echo $MSG_USAGE
-            ;;
-    esac
+    echo ${ERRORS_ARRAY[$1]}
+    echo $USAGE_INFO
+    exit 1
 }
 
 if [ $# -eq 0 ]
 then
     error $ERROR_NO_PARAMS
-    exit 1
 fi
+
+#args=($@)
+#n=0
+#echo ${args[$n]}
+
+paramExpectedDir=0
+paramExpectedReferer=0
+
+urlsCount=0
+
+for arg in $@
+do
+    if [ $paramExpectedDir -eq 1 ]
+    then
+        paramExpectedDir=0
+        dir=$arg
+        continue
+    fi
+
+    if [ $paramExpectedReferer -eq 1 ]
+    then
+        paramExpectedReferer=0
+        referer=$arg
+        continue
+    fi
+
+    case $arg in
+        "-w")
+            paramExpectedDir=1
+            ;;
+        "-r")
+            paramExpectedReferer=1
+            ;;
+        *)
+            urls[$urlsCount]=$arg
+            urlsCount=$[urlsCount + 1]
+            ;;
+    esac
+done
+
+if [ $paramExpectedDir -eq 1 ]
+then
+    error $ERROR_INVALID_PARAMS_DIR_EXPECTED
+fi
+if [ $paramExpectedReferer -eq 1 ]
+then
+    error $ERROR_INVALID_PARAMS_REFERER_EXPECTED
+fi
+
+#debug echoes
+echo $dir
+echo $referer
+echo $urlsCount
+echo ${urls[0]}
+echo ${urls[1]}
+echo ${urls[2]}
+
+exit 0
