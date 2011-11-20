@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+MSG_USAGE="Usage: fetch4me [-w <dir>] [-r <referer>] (<url>)*"
+
+ERROR_NO_PARAMS=0
+ERRORMSG_NO_PARAMS="No parameters given"
+
+error() {
+    case $1 in
+        $ERROR_NO_PARAMS)
+            echo $ERRORMSG_NO_PARAMS
+            echo $MSG_USAGE
+            ;;
+    esac
+}
+
+if [ $# -eq 0 ]
+then
+    error $ERROR_NO_PARAMS
+    exit 1
+fi
