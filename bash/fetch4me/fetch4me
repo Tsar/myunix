@@ -5,10 +5,14 @@ USAGE_INFO="Usage: fetch4me [-w <dir>] [-r <referer>] (<url>)*"
 ERROR_NO_PARAMS=0
 ERROR_INVALID_PARAMS_DIR_EXPECTED=1
 ERROR_INVALID_PARAMS_REFERER_EXPECTED=2
+ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1=3
+ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2=4
 
 ERRORS_ARRAY[$ERROR_NO_PARAMS]="No parameters given"
 ERRORS_ARRAY[$ERROR_INVALID_PARAMS_DIR_EXPECTED]="Invalid parameters: directory expected after \"-w\""
 ERRORS_ARRAY[$ERROR_INVALID_PARAMS_REFERER_EXPECTED]="Invalid parameters: referer expected after \"-r\""
+ERRORS_ARRAY[$ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1]="Config file \"~/.fetch4merc\" exists, but is not avaliable for reading"
+ERRORS_ARRAY[$ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2]="Config file \"~/.fetch4me\" exists, but is not avaliable for reading"
 
 error() {
     echo ${ERRORS_ARRAY[$1]} >&2
@@ -29,6 +33,9 @@ paramExpectedDir=0
 paramExpectedReferer=0
 
 urlsCount=0
+
+qqedir=""
+getElemFunc=""
 
 for arg in $@
 do
@@ -76,5 +83,74 @@ echo $urlsCount
 echo ${urls[0]}
 echo ${urls[1]}
 echo ${urls[2]}
+#end of debug code
+
+if [ -f "~/.fetch4merc" ]
+then
+    if [ -r "~/.fetch4merc" ]
+    then
+        if [ -z $qqedir ]
+        then
+            confDir=`cat "~/.fetch4merc" | grep "QQEDIR="`
+            if [ -n $confDir ]
+            then
+                qqedir=${confDir:7}
+                echo "Debug: setting qqedir from config 1: [$qqedir]"
+            fi
+        fi
+        confGetElemFunc=`cat "~/.fetch4merc" | grep "GETELEMFUNC="`
+        if [ -n $confGetElemFunc ]
+        then
+            getElemFunc=${confGetElemFunc:12}
+            echo "Debug: setting getElemFunc from config 1: [$getElemFunc]"
+        fi
+    else
+        error $ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1
+    fi
+fi
+
+if [ -z $qqedir ]
+then
+    if [ -f "~/.fetch4me" ]
+    then
+        if [ -r "~/.fetch4me" ]
+        then
+            confDir=`cat "~/.fetch4me" | grep "QQEDIR="`
+            if [ -n $confDir ]
+            then
+                qqedir=${confDir:7}
+                echo "Debug: setting qqedir from config 2: [$qqedir]"
+            fi
+        else
+            error $ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2
+        fi
+    fi
+fi
+
+if [ -z $getElemFunc ]
+then
+    if [ -f "~/.fetch4me" ]
+    then
+        if [ -r "~/.fetch4me" ]
+        then
+            confGetElemFunc=`cat "~/.fetch4me" | grep "GETELEMFUNC="`
+            if [ -n $confGetElemFunc ]
+            then
+                getElemFunc=${confGetElemFunc:12}
+                echo "Debug: setting getElemFunc from config 2: [$getElemFunc]"
+            fi
+        else
+            error $ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2
+        fi
+    fi
+fi
+
+if [ -z $getElemFunc ]
+then
+    getElemFunc="wget"
+fi
+
+echo "Debug: final qqedir:      [$qqedir]"
+echo "Debug: final getElemFunc: [$getElemFunc]"
 
 exit 0
