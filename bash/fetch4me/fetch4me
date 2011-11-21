@@ -14,10 +14,24 @@ ERRORS_ARRAY[$ERROR_INVALID_PARAMS_REFERER_EXPECTED]="Invalid parameters: refere
 ERRORS_ARRAY[$ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1]="Config file \"~/.fetch4merc\" exists, but is not avaliable for reading"
 ERRORS_ARRAY[$ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2]="Config file \"~/.fetch4me\" exists, but is not avaliable for reading"
 
+homedir=`echo ~`
+
 error() {
     echo ${ERRORS_ARRAY[$1]} >&2
     echo $USAGE_INFO >&2
     exit 1
+}
+
+takeParameter() {
+    if cat "$homedir/$1" | grep "$2=" >/dev/null 2>&1
+    then
+        param=`cat "$homedir/$1" | grep "$2="`
+        paramNameLen=${#2}
+        paramNameLen=$[paramNameLen + 1]
+        paramValue=${param:$paramNameLen}
+    else
+        paramValue=""
+    fi
 }
 
 if [ $# -eq 0 ]
@@ -85,24 +99,24 @@ echo ${urls[1]}
 echo ${urls[2]}
 #end of debug code
 
-if [ -f "~/.fetch4merc" ]
+if [ -f "$homedir/.fetch4merc" ]
 then
-    if [ -r "~/.fetch4merc" ]
+    if [ -r "$homedir/.fetch4merc" ]
     then
         if [ -z $qqedir ]
         then
-            confDir=`cat "~/.fetch4merc" | grep "QQEDIR="`
+            takeParameter ".fetch4merc" "QQEDIR"
+            confDir=$paramValue
             if [ -n $confDir ]
             then
-                qqedir=${confDir:7}
-                echo "Debug: setting qqedir from config 1: [$qqedir]"
+                qqedir=$confDir
             fi
         fi
-        confGetElemFunc=`cat "~/.fetch4merc" | grep "GETELEMFUNC="`
+        takeParameter ".fetch4merc" "GETELEMFUNC"
+        confGetElemFunc=$paramValue
         if [ -n $confGetElemFunc ]
         then
-            getElemFunc=${confGetElemFunc:12}
-            echo "Debug: setting getElemFunc from config 1: [$getElemFunc]"
+            getElemFunc=$confGetElemFunc
         fi
     else
         error $ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1
@@ -111,15 +125,15 @@ fi
 
 if [ -z $qqedir ]
 then
-    if [ -f "~/.fetch4me" ]
+    if [ -f "$homedir/.fetch4me" ]
     then
-        if [ -r "~/.fetch4me" ]
+        if [ -r "$homedir/.fetch4me" ]
         then
-            confDir=`cat "~/.fetch4me" | grep "QQEDIR="`
+            takeParameter ".fetch4me" "QQEDIR"
+            confDir=$paramValue
             if [ -n $confDir ]
             then
-                qqedir=${confDir:7}
-                echo "Debug: setting qqedir from config 2: [$qqedir]"
+                qqedir=$confDir
             fi
         else
             error $ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2
@@ -129,15 +143,15 @@ fi
 
 if [ -z $getElemFunc ]
 then
-    if [ -f "~/.fetch4me" ]
+    if [ -f "$homedir/.fetch4me" ]
     then
-        if [ -r "~/.fetch4me" ]
+        if [ -r "$homedir/.fetch4me" ]
         then
-            confGetElemFunc=`cat "~/.fetch4me" | grep "GETELEMFUNC="`
+            takeParameter ".fetch4me" "GETELEMFUNC"
+            confGetElemFunc=$paramValue
             if [ -n $confGetElemFunc ]
             then
-                getElemFunc=${confGetElemFunc:12}
-                echo "Debug: setting getElemFunc from config 2: [$getElemFunc]"
+                getElemFunc=$confGetElemFunc
             fi
         else
             error $ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2
@@ -149,8 +163,5 @@ if [ -z $getElemFunc ]
 then
     getElemFunc="wget"
 fi
-
-echo "Debug: final qqedir:      [$qqedir]"
-echo "Debug: final getElemFunc: [$getElemFunc]"
 
 exit 0
