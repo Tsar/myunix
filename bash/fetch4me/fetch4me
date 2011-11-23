@@ -2,22 +2,24 @@
 
 USAGE_INFO="Usage: fetch4me [-w <dir>] [-r <referer>] (<url>)*"
 
-ERROR_NO_PARAMS=0
+ERROR_NO_URLS_GIVEN=0
 ERROR_INVALID_PARAMS_DIR_EXPECTED=1
 ERROR_INVALID_PARAMS_REFERER_EXPECTED=2
 ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1=3
 ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2=4
+ERROR_INVALID_QQEDIR=5
 
-ERRORS_ARRAY[$ERROR_NO_PARAMS]="No parameters given"
+ERRORS_ARRAY[$ERROR_NO_URLS_GIVEN]="No urls given and daemon is already running for specified QQEDIR"
 ERRORS_ARRAY[$ERROR_INVALID_PARAMS_DIR_EXPECTED]="Invalid parameters: directory expected after \"-w\""
 ERRORS_ARRAY[$ERROR_INVALID_PARAMS_REFERER_EXPECTED]="Invalid parameters: referer expected after \"-r\""
 ERRORS_ARRAY[$ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_1]="Config file \"~/.fetch4merc\" exists, but is not avaliable for reading"
 ERRORS_ARRAY[$ERROR_CONFIG_NOT_AVALIABLE_FOR_READING_2]="Config file \"~/.fetch4me\" exists, but is not avaliable for reading"
+ERRORS_ARRAY[$ERROR_INVALID_QQEDIR]="Invalid QQEDIR"
 
 homedir=`echo ~`
 
 error() {
-    echo ${ERRORS_ARRAY[$1]} >&2
+    echo "ERROR: ${ERRORS_ARRAY[$1]}" >&2
     echo $USAGE_INFO >&2
     exit 1
 }
@@ -34,17 +36,14 @@ takeParameter() {
     fi
 }
 
-if [ $# -eq 0 ]
-then
-    error $ERROR_NO_PARAMS
-fi
-
-#args=($@)
-#n=0
-#echo ${args[$n]}
+createDownloadRequestFiles() {
+    echo "todo!"
+}
 
 paramExpectedDir=0
 paramExpectedReferer=0
+
+daemon=0
 
 urlsCount=0
 
@@ -68,6 +67,9 @@ do
     fi
 
     case $arg in
+        "--daemon")
+            daemon=1
+            ;;
         "-w")
             paramExpectedDir=1
             ;;
@@ -81,6 +83,14 @@ do
     esac
 done
 
+if [ $daemon -eq 1 ]
+then
+    # code of daemon
+    sleep 20
+
+    exit 0
+fi
+
 if [ $paramExpectedDir -eq 1 ]
 then
     error $ERROR_INVALID_PARAMS_DIR_EXPECTED
@@ -90,14 +100,14 @@ then
     error $ERROR_INVALID_PARAMS_REFERER_EXPECTED
 fi
 
-#debug echoes
-echo $qqedir
-echo $referer
-echo $urlsCount
-echo ${urls[0]}
-echo ${urls[1]}
-echo ${urls[2]}
-#end of debug code
+# debug echoes
+#echo $qqedir
+#echo $referer
+#echo $urlsCount
+#echo ${urls[0]}
+#echo ${urls[1]}
+#echo ${urls[2]}
+# end of debug code
 
 if [ -f "$homedir/.fetch4merc" ]
 then
@@ -141,6 +151,11 @@ then
     fi
 fi
 
+if [ ! -d $qqedir ]
+then
+    error $ERROR_INVALID_QQEDIR
+fi
+
 if [ -z $getElemFunc ]
 then
     if [ -f "$homedir/.fetch4me" ]
@@ -162,6 +177,20 @@ fi
 if [ -z $getElemFunc ]
 then
     getElemFunc="wget"
+fi
+
+if ps axu | grep "fetch4me --daemon -w \"$qqedir\"" | grep -vq "grep"
+then
+    if [ $urlsCount -eq 0 ]
+    then
+        error $ERROR_NO_URLS_GIVEN
+    fi
+
+    createDownloadRequestFiles
+else
+    createDownloadRequestFiles
+
+    ./fetch4me --daemon -w "\"$qqedir\""&
 fi
 
 exit 0
