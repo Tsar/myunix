@@ -179,7 +179,7 @@ then
     getElemFunc="wget"
 fi
 
-if ps axu | grep "fetch4me --daemon -w \"$qqedir\"" | grep -vq "grep"
+if ps axu | grep "fetch4me --daemon -w \"$qqedir\"" | grep -vq "grep .*fetch4me --daemon -w \"$qqedir\""
 then
     if [ $urlsCount -eq 0 ]
     then
