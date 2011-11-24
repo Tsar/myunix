@@ -37,7 +37,14 @@ takeParameter() {
 }
 
 createDownloadRequestFiles() {
-    echo "todo!"
+    for i in `seq 0 $[urlsCount - 1]`
+    do
+        url=${urls[$i]}
+        fname="$qqedir/${url//"/"/_}_${referer//"/"/_}"
+        echo "$url"     >  "$fname.drf_tmp"
+        echo "$referer" >> "$fname.drf_tmp"
+        mv "$fname.drf_tmp" "$fname.drf"
+    done
 }
 
 paramExpectedDir=0
@@ -49,6 +56,7 @@ urlsCount=0
 
 qqedir=""
 getElemFunc=""
+referer=""
 
 n=0
 
@@ -104,15 +112,6 @@ if [ $paramExpectedReferer -eq 1 ]
 then
     error $ERROR_INVALID_PARAMS_REFERER_EXPECTED
 fi
-
-# debug echoes
-#echo $qqedir
-#echo $referer
-#echo $urlsCount
-#echo ${urls[0]}
-#echo ${urls[1]}
-#echo ${urls[2]}
-# end of debug code
 
 if [ -f "$homedir/.fetch4merc" ]
 then
