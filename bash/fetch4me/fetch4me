@@ -50,8 +50,13 @@ urlsCount=0
 qqedir=""
 getElemFunc=""
 
-for arg in $@
+n=0
+
+while [ $n -lt $# ]
 do
+    n=$[n + 1]
+    arg=${!n}
+
     if [ $paramExpectedDir -eq 1 ]
     then
         paramExpectedDir=0
@@ -113,7 +118,7 @@ if [ -f "$homedir/.fetch4merc" ]
 then
     if [ -r "$homedir/.fetch4merc" ]
     then
-        if [ -z $qqedir ]
+        if [ -z "$qqedir" ]
         then
             takeParameter ".fetch4merc" "QQEDIR"
             confDir=$paramValue
@@ -133,7 +138,7 @@ then
     fi
 fi
 
-if [ -z $qqedir ]
+if [ -z "$qqedir" ]
 then
     if [ -f "$homedir/.fetch4me" ]
     then
@@ -151,7 +156,7 @@ then
     fi
 fi
 
-if [ ! -d $qqedir ]
+if [ ! -d "$qqedir" ]
 then
     error $ERROR_INVALID_QQEDIR
 fi
@@ -191,6 +196,7 @@ else
     createDownloadRequestFiles
 
     ./fetch4me --daemon -w "\"$qqedir\""&
+    #echo "Daemon launched"
 fi
 
 exit 0
