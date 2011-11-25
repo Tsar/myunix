@@ -43,7 +43,7 @@ createDownloadRequestFiles() {
         fname="${url//"/"/_}_${referer//"/"/_}"
         fname="$qqedir/${fname//" "/+}"
         echo -n "$url|$referer" > "$fname.drf_tmp"
-        mv "$fname.drf_tmp" "$fname.drf"
+        mv -f "$fname.drf_tmp" "$fname.drf"
     done
 }
 
@@ -193,8 +193,6 @@ then
         then
             while read line
             do
-                echo "$line"
-
                 declare -i splitPos=`expr index "$line" "|"`
                 dlURLs[$count]=${line:0:$[splitPos - 1]}
                 dlRefs[$count]=${line:$splitPos}
@@ -227,7 +225,20 @@ then
             curRef=${dlRefs[$current]}
             curURL=${dlURLs[$current]}
             mkdir -p "$homedir/Downloads/fetched4you/${curRef//"/"/_}"
-            $getElemFunc -O "$homedir/Downloads/fetched4you/${curRef//"/"/_}/${curURL//"/"/_}" -c --referer="$curRef" "$curURL"
+
+            # Updating .status file
+            echo "Downloading: $curURL (referer: $curRef)" > "$qqedir/.status_tmp"
+            currentTmp=$[current + 1]
+            while [ $currentTmp -lt $count ]
+            do
+                echo "Queued: ${dlURLs[$currentTmp]} (referer: ${dlRefs[$currentTmp]})" >> "$qqedir/.status_tmp"
+                currentTmp=$[currentTmp + 1]
+            done
+            mv -f "$qqedir/.status_tmp" "$qqedir/.status"
+
+            #echo "DEBUG: $getElemFunc -O \"$homedir/Downloads/fetched4you/${curRef//"/"/_}/${curURL//"/"/_}\" -c --referer=\"$curRef\" \"$curURL\" >/dev/null 2>&1"
+
+            $getElemFunc -O "$homedir/Downloads/fetched4you/${curRef//"/"/_}/${curURL//"/"/_}" -c --referer="$curRef" "$curURL" >/dev/null 2>&1
 
             current=$[current + 1]
         else
