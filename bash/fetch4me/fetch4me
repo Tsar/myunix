@@ -96,50 +96,6 @@ do
     esac
 done
 
-if [ $daemon -eq 1 ]
-then
-    # Code of daemon
-    echo -n "$$" > "$qqedir/.daemon.pid"
-
-    count=0
-
-    if [ -f "$qqedir/.queue" ]
-    then
-        if [ -r "$qqedir/.queue" ]
-        then
-            #queueFileContents=`cat "$qqedir/.queue"`
-            while read line
-            do
-                echo "$line"
-
-                declare -i splitPos=`expr index "$line" "|"`
-                dlURLs[$count]=${line:0:$[splitPos - 1]}
-                dlRefs[$count]=${line:$splitPos}
-                count=$[count + 1]
-            done < "$qqedir/.queue"
-        fi
-    fi
-
-    while true
-    do
-        drfList=`ls "$qqedir" | grep ".drf$"`
-        for drf in $drfList
-        do
-            drfContent=`cat "$qqedir/$drf"`
-            echo "$drfContent" >> "$qqedir/.queue"
-            rm "$qqedir/$drf"
-            declare -i splitPos=`expr index "$drfContent" "|"`
-            dlURLs[$count]=${drfContent:0:$[splitPos - 1]}
-            dlRefs[$count]=${drfContent:$splitPos}
-            count=$[count + 1]
-        done
-
-        sleep 5
-    done
-
-    exit 0
-fi
-
 if [ $paramExpectedDir -eq 1 ]
 then
     error $ERROR_INVALID_PARAMS_DIR_EXPECTED
@@ -222,6 +178,64 @@ fi
 if [ -z $getElemFunc ]
 then
     getElemFunc="wget"
+fi
+
+if [ $daemon -eq 1 ]
+then
+    # Code of daemon
+    echo -n "$$" > "$qqedir/.daemon.pid"
+
+    count=0
+
+    if [ -f "$qqedir/.queue" ]
+    then
+        if [ -r "$qqedir/.queue" ]
+        then
+            while read line
+            do
+                echo "$line"
+
+                declare -i splitPos=`expr index "$line" "|"`
+                dlURLs[$count]=${line:0:$[splitPos - 1]}
+                dlRefs[$count]=${line:$splitPos}
+                count=$[count + 1]
+            done < "$qqedir/.queue"
+        fi
+    fi
+
+    current=0
+
+    while true
+    do
+        if ls "$qqedir" | grep ".drf$" >/dev/null 2>&1
+        then
+            drfList=`ls "$qqedir" | grep ".drf$"`
+            for drf in $drfList
+            do
+                drfContent=`cat "$qqedir/$drf"`
+                echo "$drfContent" >> "$qqedir/.queue"
+                rm "$qqedir/$drf"
+                declare -i splitPos=`expr index "$drfContent" "|"`
+                dlURLs[$count]=${drfContent:0:$[splitPos - 1]}
+                dlRefs[$count]=${drfContent:$splitPos}
+                count=$[count + 1]
+            done
+        fi
+
+        if [ $current -lt $count ]
+        then
+            curRef=${dlRefs[$current]}
+            curURL=${dlURLs[$current]}
+            mkdir -p "$homedir/Downloads/fetched4you/${curRef//"/"/_}"
+            $getElemFunc -O "$homedir/Downloads/fetched4you/${curRef//"/"/_}/${curURL//"/"/_}" -c --referer="$curRef" "$curURL"
+
+            current=$[current + 1]
+        else
+            sleep 5
+        fi
+    done
+
+    exit 0
 fi
 
 daemonPID="none"
