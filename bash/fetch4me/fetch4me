@@ -240,8 +240,25 @@ then
 
             $getElemFunc -O "$homedir/Downloads/fetched4you/${curRef//"/"/_}/${curURL//"/"/_}" -c --referer="$curRef" "$curURL" >/dev/null 2>&1
 
+            curUTC=`date +%s`
+            echo "$curUTC $curRef $curURL" >> "$qqedir/.finished"
+
+            lnNum=0
+            echo -n "" > "$qqedir/.queue_tmp"
+            while read line
+            do
+                if [ $lnNum -ne 0 ]
+                then
+                    echo "$line" >> "$qqedir/.queue_tmp"
+                fi
+                lnNum=$[lnNum + 1]
+            done < "$qqedir/.queue"
+            mv -f "$qqedir/.queue_tmp" "$qqedir/.queue"
+
             current=$[current + 1]
         else
+            echo -n "" > "$qqedir/.status"
+
             sleep 5
         fi
     done
