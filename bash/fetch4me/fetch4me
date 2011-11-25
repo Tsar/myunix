@@ -40,9 +40,9 @@ createDownloadRequestFiles() {
     for i in `seq 0 $[urlsCount - 1]`
     do
         url=${urls[$i]}
-        fname="$qqedir/${url//"/"/_}_${referer//"/"/_}"
-        echo "$url"     >  "$fname.drf_tmp"
-        echo "$referer" >> "$fname.drf_tmp"
+        fname="${url//"/"/_}_${referer//"/"/_}"
+        fname="$qqedir/${fname//" "/+}"
+        echo -n "$url|$referer" > "$fname.drf_tmp"
         mv "$fname.drf_tmp" "$fname.drf"
     done
 }
@@ -101,7 +101,41 @@ then
     # Code of daemon
     echo -n "$$" > "$qqedir/.daemon.pid"
 
-    sleep 20
+    count=0
+
+    if [ -f "$qqedir/.queue" ]
+    then
+        if [ -r "$qqedir/.queue" ]
+        then
+            #queueFileContents=`cat "$qqedir/.queue"`
+            while read line
+            do
+                echo "$line"
+
+                declare -i splitPos=`expr index "$line" "|"`
+                dlURLs[$count]=${line:0:$[splitPos - 1]}
+                dlRefs[$count]=${line:$splitPos}
+                count=$[count + 1]
+            done < "$qqedir/.queue"
+        fi
+    fi
+
+    while true
+    do
+        drfList=`ls "$qqedir" | grep ".drf$"`
+        for drf in $drfList
+        do
+            drfContent=`cat "$qqedir/$drf"`
+            echo "$drfContent" >> "$qqedir/.queue"
+            rm "$qqedir/$drf"
+            declare -i splitPos=`expr index "$drfContent" "|"`
+            dlURLs[$count]=${drfContent:0:$[splitPos - 1]}
+            dlRefs[$count]=${drfContent:$splitPos}
+            count=$[count + 1]
+        done
+
+        sleep 5
+    done
 
     exit 0
 fi
