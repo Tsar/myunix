@@ -98,7 +98,9 @@ done
 
 if [ $daemon -eq 1 ]
 then
-    # code of daemon
+    # Code of daemon
+    echo -n "$$" > "$qqedir/.daemon.pid"
+
     sleep 20
 
     exit 0
@@ -155,6 +157,11 @@ then
     fi
 fi
 
+if [ -z "$qqedir" ]
+then
+    error $ERROR_INVALID_QQEDIR
+fi
+
 if [ ! -d "$qqedir" ]
 then
     error $ERROR_INVALID_QQEDIR
@@ -183,7 +190,17 @@ then
     getElemFunc="wget"
 fi
 
-if ps axu | grep "fetch4me --daemon -w \"$qqedir\"" | grep -vq "grep .*fetch4me --daemon -w \"$qqedir\""
+daemonPID="none"
+
+if [ -f "$qqedir/.daemon.pid" ]
+then
+    if [ -r "$qqedir/.daemon.pid" ]
+    then
+        daemonPID=`cat "$qqedir/.daemon.pid"`
+    fi
+fi
+
+if ps -A -o pid | grep "^$daemonPID$" >/dev/null 2>&1
 then
     if [ $urlsCount -eq 0 ]
     then
@@ -194,8 +211,11 @@ then
 else
     createDownloadRequestFiles
 
-    ./fetch4me --daemon -w "\"$qqedir\""&
-    #echo "Daemon launched"
+    # This doesn't work, I don't know why
+    #trap "" SIGHUP
+
+    # Using alternative daemon creation method
+    ./fetch4me --daemon -w "$qqedir"&
 fi
 
 exit 0
