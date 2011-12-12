@@ -7,23 +7,7 @@ make_pwd() {
     done
 }
 
-if [ $# -gt 0 ]
-then
-    startI=$1
-else
-    startI=0
-    ./uncrypt.sh 1000 &
-    ./uncrypt.sh 2000 &
-    ./uncrypt.sh 3000 &
-    ./uncrypt.sh 4000 &
-    ./uncrypt.sh 5000 &
-    ./uncrypt.sh 6000 &
-    ./uncrypt.sh 7000 &
-    ./uncrypt.sh 8000 &
-    ./uncrypt.sh 9000 &
-fi
-
-i=$startI
+i=0
 make_pwd
 unlocked=0
 
@@ -39,9 +23,9 @@ do
     else
         i=$[i + 1]
         make_pwd
-        if [ ${i:-3} -eq 000 ]
+        if [ $i -eq 10000 ]
         then
-            echo "search in interval [$startI; $i) unsuccessfull"
+            echo "pass not decrypted"
         fi
     fi
 done
