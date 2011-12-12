@@ -1,4 +1,5 @@
 #!/bin/bash
+
 make_pwd() {
     pwd=$i
     while [ ${#pwd} -ne 4 ]
@@ -18,7 +19,6 @@ do
     if 7z x -p$pwd tex2html-test.tar.7z >/dev/null 2>&1
     then
         echo "pass $pwd is correct"
-        echo "$pwd" > password.txt
         unlocked=1
     else
         i=$[i + 1]
@@ -26,6 +26,14 @@ do
         if [ $i -eq 10000 ]
         then
             echo "pass not decrypted"
+            exit 1
         fi
     fi
 done
+
+echo "extracting subarchive"
+tar -xf tex2html-test.tar
+
+echo "all extractions done"
+
+exit 0
