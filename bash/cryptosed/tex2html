@@ -26,13 +26,13 @@ do
     line=`echo "$line" | sed -e 's/   */ /g'`
     if [ ${#line} -gt 0 ]
     then
-        if echo "$line" | grep "^\\\\section{" >/dev/null 2>&1
+        if echo "$line" | grep "^\\\\section{.*}$" >/dev/null 2>&1
         then
             closeParagraphIfOpened
             line=${line:9}
             echo "<h1>${line:0:$[${#line} - 1]}</h1>"
         else
-            if echo "$line" | grep "^\\\\subsection{" >/dev/null 2>&1
+            if echo "$line" | grep "^\\\\subsection{.*}$" >/dev/null 2>&1
             then
                 closeParagraphIfOpened
                 line=${line:12}
