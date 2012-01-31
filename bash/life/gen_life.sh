@@ -47,7 +47,7 @@ do
     for j in `seq 0 15`
     do
         c=0
-        for neighbour in "${neighbours[$j]}"
+        for neighbour in ${neighbours[$j]}
         do
             if [ "${f[$neighbour]}" -eq 1 ]
             then
