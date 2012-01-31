@@ -29,7 +29,12 @@ neighbours[15]="10 11 8 14 12 2 3 0"
 
 for i in `seq 0 65535`
 do
-    echo "Generating $i of 65535"
+    let "mod=$i%100"
+    if [ "$mod" -eq 0 ]
+    then
+        echo "Generating $i in 0..65535"
+    fi
+
     for j in `seq 0 15`
     do
         let "k=2**$j"
