@@ -1,12 +1,12 @@
 CC=gcc
 
-all: myalloc test
+all: libmyalloc test
 
-myalloc: myalloc.c
-	$(CC) -fPIC -shared myalloc.c -o myalloc.so
+libmyalloc: myalloc.c
+	$(CC) -fPIC -shared myalloc.c -o libmyalloc.so
 
 test: test.c
 	$(CC) test.c -o test
 
 clean:
-	rm myalloc.so test
+	rm libmyalloc.so test

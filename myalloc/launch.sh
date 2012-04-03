@@ -1,2 +1,2 @@
 #!/bin/bash
-LD_PRELOAD=./myalloc.so ./test
+LD_PRELOAD=./libmyalloc.so ./test
