@@ -7,7 +7,7 @@ typedef struct BucketStruct {
     int isFree;
     void* ptr;
     size_t size;
-    struct BucketStruct* next;
+    struct BucketStruct* next, prev;
 } Bucket;
 
 Bucket* globalBucketList;
@@ -43,10 +43,10 @@ ThreadInfo* createCurThreadInfo() {
     if (threadInfo[curThreadId % HASHMAP_SIZE] == 0) {
         threadInfo[curThreadId % HASHMAP_SIZE] = newThreadInfo;
     } else {
-        ThreadInfo* prev = threadInfo[curThreadId % HASHMAP_SIZE];
-        while (prev->next != 0)
-            prev = prev->next;
-        prev->next = newThreadInfo;
+        ThreadInfo* previousInList = threadInfo[curThreadId % HASHMAP_SIZE];
+        while (previousInList->next != 0)
+            previousInList = previousInList->next;
+        previousInList->next = newThreadInfo;
     }
     return newThreadInfo;
 }
@@ -61,11 +61,13 @@ Bucket* searchFreeBucketInList(Bucket* bList, size_t minSize) {
 void addBucketToList(Bucket* b, Bucket* bList) {
     if (bList == 0) {
         bList = b;
+        b->prev = 0;
     } else {
-        Bucket* prev = bList;
-        while (prev->next != 0)
-            prev = prev->next;
-        prev->next = b;
+        Bucket* previousInList = bList;
+        while (previousInList->next != 0)
+            previousInList = previousInList->next;
+        previousInList->next = b;
+        b->prev = previousInList;
     }
 }
 
@@ -73,7 +75,7 @@ void* malloc(size_t size) {
     ThreadInfo* curThreadInfo = getCurThreadInfo();
     if (curThreadInfo == 0)
         curThreadInfo = createCurThreadInfo();
-    if (size > N) {
+    if (size >= N) {
         Bucket* bb = searchFreeBucketInList(curThreadInfo->bigBucketList, size);
         if (bb != 0) {
             bb->isFree = 0;
