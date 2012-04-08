@@ -3,26 +3,19 @@
 
 #define N 5000
 
-typedef struct BigBucketStruct {
+typedef struct BucketStruct {
     int isFree;
     void* ptr;
     size_t size;
-    struct BigBucketStruct* next;
-} BigBucket;
+    struct BucketStruct* next;
+} Bucket;
 
-typedef struct SmallBucketStruct {
-    int isFree;
-    void* ptr;
-    size_t size;
-    struct SmallBucketStruct* next;
-} SmallBucket;
-
-BigBucket* globalBigBucketList;
+Bucket* globalBucketList;
 
 typedef struct ThreadInfoStruct {
     pthread_t threadId;
-    BigBucket* bigBucketList;
-    SmallBucket* smallBucketList;
+    Bucket* bigBucketList;
+    Bucket* smallBucketList;
     struct ThreadInfoStruct* next;
 } ThreadInfo;
 
@@ -58,39 +51,21 @@ ThreadInfo* createCurThreadInfo() {
     return newThreadInfo;
 }
 
-BigBucket* searchFreeBigBucketInList(BigBucket* bbList, size_t minSize) {
-    BigBucket* cur = bbList;
+Bucket* searchFreeBucketInList(Bucket* bList, size_t minSize) {
+    Bucket* cur = bList;
     while (cur != 0 || cur->isFree == 0 && cur->size < minSize)
         cur = cur->next;
     return cur;
 }
 
-void addBigBucketToList(BigBucket* bb, BigBucket* bbList) {
-    if (bbList == 0) {
-        bbList = bb;
+void addBucketToList(Bucket* b, Bucket* bList) {
+    if (bList == 0) {
+        bList = b;
     } else {
-        BigBucket* prev = bbList;
+        Bucket* prev = bList;
         while (prev->next != 0)
             prev = prev->next;
-        prev->next = bb;
-    }
-}
-
-SmallBucket* searchFreeSmallBucketInList(SmallBucket* sbList, size_t minSize) {
-    SmallBucket* cur = sbList;
-    while (cur != 0 || cur->isFree == 0 && cur->size < minSize)
-        cur = cur->next;
-    return cur;
-}
-
-void addSmallBucketToList(SmallBucket* sb, SmallBucket* sbList) {
-    if (sbList == 0) {
-        sbList = sb;
-    } else {
-        SmallBucket* prev = sbList;
-        while (prev->next != 0)
-            prev = prev->next;
-        prev->next = sb;
+        prev->next = b;
     }
 }
 
@@ -99,35 +74,35 @@ void* malloc(size_t size) {
     if (curThreadInfo == 0)
         curThreadInfo = createCurThreadInfo();
     if (size > N) {
-        BigBucket* bb = searchFreeBigBucketInList(curThreadInfo->bigBucketList, size);
+        Bucket* bb = searchFreeBucketInList(curThreadInfo->bigBucketList, size);
         if (bb != 0) {
             bb->isFree = 0;
             return bb->ptr;
         }
-        bb = searchFreeBigBucketInList(globalBigBucketList, size);
+        bb = searchFreeBucketInList(globalBucketList, size);
         if (bb != 0) {
             bb->isFree = 0;
             return bb->ptr;
         }
-        bb = (BigBucket*)mmap(0, sizeof(BigBucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        bb = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         bb->isFree = 0;
-        bb->ptr = ((void*)bb) + sizeof(BigBucket);
+        bb->ptr = ((void*)bb) + sizeof(Bucket);
         bb->size = size;
         bb->next = 0;
-        addBigBucketToList(bb, curThreadInfo->bigBucketList);
+        addBucketToList(bb, curThreadInfo->bigBucketList);
         return bb->ptr;
     } else {
-        SmallBucket* sb = searchFreeSmallBucketInList(curThreadInfo->smallBucketList, size);
+        Bucket* sb = searchFreeBucketInList(curThreadInfo->smallBucketList, size);
         if (sb != 0) {
             sb->isFree = 0;
             return sb->ptr;
         }
-        sb = (SmallBucket*)mmap(0, sizeof(SmallBucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        sb = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         sb->isFree = 0;
-        sb->ptr = ((void*)sb) + sizeof(SmallBucket);
+        sb->ptr = ((void*)sb) + sizeof(Bucket);
         sb->size = size;
         sb->next = 0;
-        addSmallBucketToList(sb, curThreadInfo->smallBucketList);
+        addBucketToList(sb, curThreadInfo->smallBucketList);
         return sb->ptr;
     }
 }
