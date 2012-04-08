@@ -41,6 +41,7 @@ ThreadInfo* createCurThreadInfo() {
     newThreadInfo->smallBucketList = 0;
     newThreadInfo->next = 0;
     
+    /*
     if (threadInfo[curThreadId % HASHMAP_SIZE] == 0) {
         threadInfo[curThreadId % HASHMAP_SIZE] = newThreadInfo;
     } else {
@@ -49,6 +50,10 @@ ThreadInfo* createCurThreadInfo() {
             previousInList = previousInList->next;
         previousInList->next = newThreadInfo;
     }
+    */
+    newThreadInfo->next = threadInfo[curThreadId % HASHMAP_SIZE];
+    threadInfo[curThreadId % HASHMAP_SIZE] = newThreadInfo;
+    
     return newThreadInfo;
 }
 
