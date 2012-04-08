@@ -3,6 +3,12 @@
 
 #define N 5000
 
+#define MAX_BB_LIST_SIZE 10
+#define MAX_GB_LIST_SIZE 20
+#define MAX_SB_LIST_SIZE 100
+
+#define HASHMAP_SIZE 10000
+
 typedef struct BucketStruct {
     void* ptr;
     size_t size;
@@ -10,16 +16,17 @@ typedef struct BucketStruct {
     struct BucketStruct* prev;
 } Bucket;
 
-Bucket* globalBucketList;
+Bucket* globalBigBucketList;
+int gbListSize = 0;
 
 typedef struct ThreadInfoStruct {
     pthread_t threadId;
     Bucket* bigBucketList;
+    int bbListSize;
     Bucket* smallBucketList;
+    int sbListSize;
     struct ThreadInfoStruct* next;
 } ThreadInfo;
-
-#define HASHMAP_SIZE 10000
 
 ThreadInfo* threadInfo[HASHMAP_SIZE];
 
@@ -33,7 +40,9 @@ ThreadInfo* getCurThreadInfo() {
     
         curThreadInfo->threadId = curThreadId;
         curThreadInfo->bigBucketList = 0;
+        curThreadInfo->bbListSize = 0;
         curThreadInfo->smallBucketList = 0;
+        curThreadInfo->sbListSize = 0;
         curThreadInfo->next = 0;
         
         curThreadInfo->next = threadInfo[curThreadId % HASHMAP_SIZE];
@@ -71,6 +80,15 @@ void deleteBucketFromList(Bucket* b, Bucket** bList) {
     b->prev = 0;
 }
 
+Bucket* getLastBucketInList(Bucket* bList) {
+    if (bList == 0)
+        return 0;
+    Bucket* cur = bList;
+    while (cur->next != 0)
+        cur = cur->next;
+    return cur;
+}
+
 Bucket* createNewBucket(size_t size) {
     Bucket* b = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     b->ptr = ((void*)b) + sizeof(Bucket);
@@ -80,17 +98,23 @@ Bucket* createNewBucket(size_t size) {
     return b;
 }
 
+void destroyBucket(Bucket* b) {
+    munmap((void*)b, sizeof(Bucket) + b->size);
+}
+
 void* malloc(size_t size) {
     ThreadInfo* curThreadInfo = getCurThreadInfo();
     if (size >= N) {
         Bucket* bb = searchBucketInList(curThreadInfo->bigBucketList, size);
         if (bb != 0) {
             deleteBucketFromList(bb, &curThreadInfo->bigBucketList);
+            --curThreadInfo->bbListSize;
             return bb->ptr;
         }
-        bb = searchBucketInList(globalBucketList, size);
+        bb = searchBucketInList(globalBigBucketList, size);
         if (bb != 0) {
-            deleteBucketFromList(bb, &globalBucketList);
+            deleteBucketFromList(bb, &globalBigBucketList);
+            --gbListSize;
             return bb->ptr;
         }
         bb = createNewBucket(size);
@@ -99,6 +123,7 @@ void* malloc(size_t size) {
         Bucket* sb = searchBucketInList(curThreadInfo->smallBucketList, size);
         if (sb != 0) {
             deleteBucketFromList(sb, &curThreadInfo->smallBucketList);
+            --curThreadInfo->sbListSize;
             return sb->ptr;
         }
         sb = createNewBucket(size);
@@ -111,7 +136,26 @@ void free(void* ptr) {
     Bucket* curBucket = (Bucket*)(ptr - sizeof(Bucket));
     if (curBucket->size >= N) {
         addBucketToList(curBucket, &curThreadInfo->bigBucketList);
-        //..
+        ++curThreadInfo->bbListSize;
+        if (curThreadInfo->bbListSize >= MAX_BB_LIST_SIZE) {
+            //I think, it's better to move out (to globalBigBucketList) NOT curBucket,
+            //because there can be smaller buckets holding place in list, so we will alloc and free bigger bucket every time.
+            //Moving out smallest bucket is also a bad idea: this means, that sum size of buckets in list will only increase.
+            //So I'll take the last bucket in list (adding to list adds to front, so that's a kind of a queue).
+            Bucket* toMoveToGlobalBBList = getLastBucketInList(curThreadInfo->bigBucketList);
+            deleteBucketFromList(toMoveToGlobalBBList, &curThreadInfo->bigBucketList);
+            --curThreadInfo->bbListSize;
+
+            addBucketToList(toMoveToGlobalBBList, &globalBigBucketList);
+            ++gbListSize;
+            if (gbListSize >= MAX_GB_LIST_SIZE) {
+                Bucket* toDestroy = getLastBucketInList(globalBigBucketList);
+                deleteBucketFromList(toDestroy, &globalBigBucketList);
+                --gbListSize;
+
+                destroyBucket(toDestroy);
+            }
+        }
     } else {
         //..
     }
