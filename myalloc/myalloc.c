@@ -112,6 +112,27 @@ void destroyBucket(Bucket* b) {
     munmap((void*)b, sizeof(Bucket) + b->size);
 }
 
+void destroyBucketList(Bucket* bList) {
+    if (bList == 0)
+        return;
+    if (bList->next != 0)
+        destroyBucketList(bList->next);
+
+    destroyBucket(bList);
+}
+
+void destroyThreadInfoList(ThreadInfo* tInfo) {
+    if (tInfo == 0)
+        return;
+    destroyThreadInfoList(tInfo->next);
+    pthread_mutex_destroy(tInfo->bbListMutex);
+    pthread_mutex_destroy(tInfo->sbListMutex);
+    destroyBucketList(tInfo->bigBucketList);
+    destroyBucketList(tInfo->smallBucketList);
+
+    munmap((void*)tInfo, sizeof(ThreadInfo));
+}
+
 void _init() {
     pthread_mutex_init(threadInfoMutex, 0);
     pthread_mutex_init(gbListMutex, 0);
@@ -121,7 +142,11 @@ void _fini() {
     pthread_mutex_destroy(threadInfoMutex);
     pthread_mutex_destroy(gbListMutex);
 
-    //TODO: munmap everything left
+    int i;
+    for (i = 0; i < HASHMAP_SIZE; ++i)
+        destroyThreadInfoList(threadInfo[i]);
+
+    destroyBucketList(globalBigBucketList);
 }
 
 void* malloc(size_t size) {
