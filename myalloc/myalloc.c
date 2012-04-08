@@ -71,6 +71,15 @@ void addBucketToList(Bucket* b, Bucket* bList) {
     }
 }
 
+Bucket* createNewBucket(size_t size) {
+    Bucket* b = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    b->isFree = 0;
+    b->ptr = ((void*)bb) + sizeof(Bucket);
+    b->size = size;
+    b->next = 0;
+    return b;
+}
+
 void* malloc(size_t size) {
     ThreadInfo* curThreadInfo = getCurThreadInfo();
     if (curThreadInfo == 0)
@@ -86,11 +95,7 @@ void* malloc(size_t size) {
             bb->isFree = 0;
             return bb->ptr;
         }
-        bb = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        bb->isFree = 0;
-        bb->ptr = ((void*)bb) + sizeof(Bucket);
-        bb->size = size;
-        bb->next = 0;
+        bb = createNewBucket(size);
         addBucketToList(bb, curThreadInfo->bigBucketList);
         return bb->ptr;
     } else {
@@ -99,16 +104,13 @@ void* malloc(size_t size) {
             sb->isFree = 0;
             return sb->ptr;
         }
-        sb = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        sb->isFree = 0;
-        sb->ptr = ((void*)sb) + sizeof(Bucket);
-        sb->size = size;
-        sb->next = 0;
+        sb = createNewBucket(size);
         addBucketToList(sb, curThreadInfo->smallBucketList);
         return sb->ptr;
     }
 }
 
 void free(void* ptr) {
-    //
+    Bucket* curBucket = (Bucket*)(ptr - sizeof(Bucket));
+    //...
 }
