@@ -14,6 +14,7 @@ typedef struct BucketStruct {
     size_t size;
     struct BucketStruct* next;
     struct BucketStruct* prev;
+    pthread_t creatorThreadId;
 } Bucket;
 
 Bucket* globalBigBucketList;
@@ -30,25 +31,24 @@ typedef struct ThreadInfoStruct {
 
 ThreadInfo* threadInfo[HASHMAP_SIZE];
 
-ThreadInfo* getCurThreadInfo() {
-    pthread_t curThreadId = pthread_self();
-    ThreadInfo* curThreadInfo = threadInfo[curThreadId % HASHMAP_SIZE];
-    while (curThreadInfo != 0 || curThreadInfo->threadId != curThreadId)
-        curThreadInfo = curThreadInfo->next;
-    if (curThreadInfo == 0) {
-        curThreadInfo = (ThreadInfo*)mmap(0, sizeof(ThreadInfo), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+ThreadInfo* getThreadInfo(pthread_t tId) {
+    ThreadInfo* tInfo = threadInfo[tId % HASHMAP_SIZE];
+    while (tInfo != 0 || tInfo->threadId != tId)
+        tInfo = tInfo->next;
+    if (tInfo == 0) {
+        tInfo = (ThreadInfo*)mmap(0, sizeof(ThreadInfo), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     
-        curThreadInfo->threadId = curThreadId;
-        curThreadInfo->bigBucketList = 0;
-        curThreadInfo->bbListSize = 0;
-        curThreadInfo->smallBucketList = 0;
-        curThreadInfo->sbListSize = 0;
-        curThreadInfo->next = 0;
+        tInfo->threadId = tId;
+        tInfo->bigBucketList = 0;
+        tInfo->bbListSize = 0;
+        tInfo->smallBucketList = 0;
+        tInfo->sbListSize = 0;
+        tInfo->next = 0;
         
-        curThreadInfo->next = threadInfo[curThreadId % HASHMAP_SIZE];
-        threadInfo[curThreadId % HASHMAP_SIZE] = curThreadInfo;
+        tInfo->next = threadInfo[tId % HASHMAP_SIZE];
+        threadInfo[tId % HASHMAP_SIZE] = tInfo;
     }
-    return curThreadInfo;
+    return tInfo;
 }
 
 Bucket* searchBucketInList(Bucket* bList, size_t minSize) {
@@ -95,6 +95,7 @@ Bucket* createNewBucket(size_t size) {
     b->size = size;
     b->next = 0;
     b->prev = 0;
+    b->creatorThreadId = pthread_self();
     return b;
 }
 
@@ -103,12 +104,12 @@ void destroyBucket(Bucket* b) {
 }
 
 void* malloc(size_t size) {
-    ThreadInfo* curThreadInfo = getCurThreadInfo();
+    ThreadInfo* tInfo = getThreadInfo(pthread_self());
     if (size >= N) {
-        Bucket* bb = searchBucketInList(curThreadInfo->bigBucketList, size);
+        Bucket* bb = searchBucketInList(tInfo->bigBucketList, size);
         if (bb != 0) {
-            deleteBucketFromList(bb, &curThreadInfo->bigBucketList);
-            --curThreadInfo->bbListSize;
+            deleteBucketFromList(bb, &tInfo->bigBucketList);
+            --tInfo->bbListSize;
             return bb->ptr;
         }
         bb = searchBucketInList(globalBigBucketList, size);
@@ -120,10 +121,10 @@ void* malloc(size_t size) {
         bb = createNewBucket(size);
         return bb->ptr;
     } else {
-        Bucket* sb = searchBucketInList(curThreadInfo->smallBucketList, size);
+        Bucket* sb = searchBucketInList(tInfo->smallBucketList, size);
         if (sb != 0) {
-            deleteBucketFromList(sb, &curThreadInfo->smallBucketList);
-            --curThreadInfo->sbListSize;
+            deleteBucketFromList(sb, &tInfo->smallBucketList);
+            --tInfo->sbListSize;
             return sb->ptr;
         }
         sb = createNewBucket(size);
@@ -132,19 +133,20 @@ void* malloc(size_t size) {
 }
 
 void free(void* ptr) {
-    ThreadInfo* curThreadInfo = getCurThreadInfo();
     Bucket* curBucket = (Bucket*)(ptr - sizeof(Bucket));
     if (curBucket->size >= N) {
-        addBucketToList(curBucket, &curThreadInfo->bigBucketList);
-        ++curThreadInfo->bbListSize;
-        if (curThreadInfo->bbListSize >= MAX_BB_LIST_SIZE) {
+        ThreadInfo* tInfo = getThreadInfo(pthread_self());
+
+        addBucketToList(curBucket, &tInfo->bigBucketList);
+        ++tInfo->bbListSize;
+        if (tInfo->bbListSize >= MAX_BB_LIST_SIZE) {
             //I think, it's better to move out (to globalBigBucketList) NOT curBucket,
             //because there can be smaller buckets holding place in list, so we will alloc and free bigger bucket every time.
             //Moving out smallest bucket is also a bad idea: this means, that sum size of buckets in list will only increase.
             //So I'll take the last bucket in list (adding to list adds to front, so that's a kind of a queue).
-            Bucket* toMoveToGlobalBBList = getLastBucketInList(curThreadInfo->bigBucketList);
-            deleteBucketFromList(toMoveToGlobalBBList, &curThreadInfo->bigBucketList);
-            --curThreadInfo->bbListSize;
+            Bucket* toMoveToGlobalBBList = getLastBucketInList(tInfo->bigBucketList);
+            deleteBucketFromList(toMoveToGlobalBBList, &tInfo->bigBucketList);
+            --tInfo->bbListSize;
 
             addBucketToList(toMoveToGlobalBBList, &globalBigBucketList);
             ++gbListSize;
@@ -157,6 +159,16 @@ void free(void* ptr) {
             }
         }
     } else {
-        //..
+        ThreadInfo* tInfo = getThreadInfo(curBucket->creatorThreadId);
+
+        addBucketToList(curBucket, &tInfo->smallBucketList);
+        ++tInfo->sbListSize;
+        if (tInfo->sbListSize >= MAX_SB_LIST_SIZE) {
+            Bucket* toDestroy = getLastBucketInList(tInfo->smallBucketList);
+            deleteBucketFromList(toDestroy, &tInfo->smallBucketList);
+            --tInfo->sbListSize;
+
+            destroyBucket(toDestroy);
+        }
     }
 }
