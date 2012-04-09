@@ -45,34 +45,6 @@ ThreadInfo* threadInfo[HASHMAP_SIZE] = {};
 
 pthread_mutex_t threadInfoMutex;
 
-#define DEBUG_OUTPUT
-
-#ifdef DEBUG_OUTPUT
-
-#include <fcntl.h>
-
-#define NUMBER_BUFFER_SIZE 12
-
-void writeNumber(size_t number) {
-    char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
-    int i = NUMBER_BUFFER_SIZE - 1;
-    while (i >= 0) {
-        buf[i--] = '0' + (number % 10);
-        number /= 10;
-        if (number == 0)
-            break;
-    }
-    write(1, buf, NUMBER_BUFFER_SIZE);
-}
-
-void writeThreadId() {
-    write(1, "thread[", 7);
-    writeNumber(pthread_self());
-    write(1, "]: ", 3);
-}
-
-#endif
-
 ThreadInfo* getThreadInfo(pthread_t tId) {
     ThreadInfo* tInfo = threadInfo[tId % HASHMAP_SIZE];
     while (tInfo != 0 && tInfo->threadId != tId)
@@ -98,6 +70,40 @@ ThreadInfo* getThreadInfo(pthread_t tId) {
     }
     return tInfo;
 }
+
+#define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+
+#include <fcntl.h>
+
+#define NUMBER_BUFFER_SIZE 12
+
+void writeNumber(size_t number, int bufLen) {
+    char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+    int i = bufLen - 1;
+    while (i >= 0) {
+        buf[i--] = '0' + (number % 10);
+        number /= 10;
+        if (number == 0)
+            break;
+    }
+    write(1, buf, bufLen);
+}
+
+void writeThreadInfo() {
+    pthread_t tId = pthread_self();
+    ThreadInfo* tInfo = getThreadInfo(tId);
+    write(1, "thread[", 7);
+    writeNumber(tId, NUMBER_BUFFER_SIZE);
+    write(1, ", bb: ", 6);
+    writeNumber(tInfo->bbListSize, 4);
+    write(1, ", sb: ", 6);
+    writeNumber(tInfo->sbListSize, 4);
+    write(1, "]: ", 3);
+}
+
+#endif
 
 Bucket* searchBucketInList(Bucket* bList, size_t minSize) {
     Bucket* cur = bList;
@@ -231,11 +237,11 @@ void* malloc(size_t size) {
     }
 
 #ifdef DEBUG_OUTPUT
-    writeThreadId();
+    writeThreadInfo();
     write(1, "malloc (", 8);
-    writeNumber(size);
+    writeNumber(size, NUMBER_BUFFER_SIZE);
     write(1, ") = ", 4);
-    writeNumber((size_t)res);
+    writeNumber((size_t)res, NUMBER_BUFFER_SIZE);
     write(1, "\n", 1);
 #endif
 
@@ -247,9 +253,9 @@ void free(void* ptr) {
         return;
 
 #ifdef DEBUG_OUTPUT
-    writeThreadId();
+    writeThreadInfo();
     write(1, "free   (", 8);
-    writeNumber((size_t)ptr);
+    writeNumber((size_t)ptr, NUMBER_BUFFER_SIZE);
     write(1, ")\n", 2);
 #endif
 
@@ -307,11 +313,11 @@ void free(void* ptr) {
 
 void* realloc(void* ptr, size_t size) {
 #ifdef DEBUG_OUTPUT
-    writeThreadId();
+    writeThreadInfo();
     write(1, "realloc(", 8);
-    writeNumber((size_t)ptr);
+    writeNumber((size_t)ptr, NUMBER_BUFFER_SIZE);
     write(1, ", ", 2);
-    writeNumber(size);
+    writeNumber(size, NUMBER_BUFFER_SIZE);
     write(1, ")\n", 2);
 #endif
 
