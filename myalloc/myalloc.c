@@ -62,7 +62,7 @@ ThreadInfo* getThreadInfo(pthread_t tId) {
 
 Bucket* searchBucketInList(Bucket* bList, size_t minSize) {
     Bucket* cur = bList;
-    while (cur != 0 || cur->size < minSize)
+    while (cur != 0 && cur->size < minSize)
         cur = cur->next;
     return cur;
 }
