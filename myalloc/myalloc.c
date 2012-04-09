@@ -53,6 +53,8 @@ pthread_mutex_t threadInfoMutex;
 
 #define NUMBER_BUFFER_SIZE 12
 
+int debugOutputLineNumber = 0;
+
 void writeNumber(size_t number, int bufLen) {
     char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
     int i = bufLen - 1;
@@ -66,7 +68,8 @@ void writeNumber(size_t number, int bufLen) {
 }
 
 void writeThreadId() {
-    write(1, "thread[", 7);
+    writeNumber(++debugOutputLineNumber, 7);
+    write(1, "| thread[", 9);
     writeNumber(pthread_self(), NUMBER_BUFFER_SIZE);
     write(1, "]: ", 3);
 }
@@ -109,7 +112,8 @@ ThreadInfo* getThreadInfo(pthread_t tId) {
 void writeThreadInfo() {
     pthread_t tId = pthread_self();
     ThreadInfo* tInfo = getThreadInfo(tId);
-    write(1, "thread[", 7);
+    writeNumber(++debugOutputLineNumber, 7);
+    write(1, "| thread[", 9);
     writeNumber(tId, NUMBER_BUFFER_SIZE);
     write(1, ", bb: ", 6);
     writeNumber(tInfo->bbListSize, 4);
