@@ -254,3 +254,18 @@ void free(void* ptr) {
         }
     }
 }
+
+void* realloc(void* ptr, size_t size) {
+    /*
+    //Note: I could just write [free(ptr); return malloc(size);] and if current bucket is enough size, than malloc will give it again,
+    //because it will be in front of the buckets list and searchBucketInList works from list's front. But to optimize and get rid of few
+    //instructions, which put bucket to front of the list and than take it from there again (everything O(1)), I do a custom check.
+    if (ptr == 0)
+        return malloc(size);
+    if (((Bucket*)(ptr - sizeof(Bucket)))->size >= size)
+        return ptr;
+    */
+
+    free(ptr);
+    return malloc(size);
+}
