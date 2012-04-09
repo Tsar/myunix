@@ -163,6 +163,13 @@ void deleteBucketFromList(Bucket* b, Bucket** bList, Bucket** bListTail) {
 }
 
 Bucket* createNewBucket(size_t size) {
+#ifdef DEBUG_OUTPUT
+    writeThreadInfo();
+    write(1, "createB(", 8);
+    writeNumber(size, NUMBER_BUFFER_SIZE);
+    write(1, ")\n", 2);
+#endif
+
     Bucket* b = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #ifdef DEBUG_OUTPUT
     if (b == MAP_FAILED) {
