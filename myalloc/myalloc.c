@@ -56,16 +56,11 @@ pthread_mutex_t threadInfoMutex;
 void writeNumber(size_t number) {
     char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
     int i = NUMBER_BUFFER_SIZE - 1;
-    if (number == 0) {
-        buf[i--] = 'O';
-        buf[i--] = 'R';
-        buf[i--] = 'E';
-        buf[i--] = 'Z';
-    } else {
-        while (i >= 0 && number % 10 > 0) {
-            buf[i--] = '0' + (number % 10);
-            number /= 10;
-        }
+    while (i >= 0) {
+        buf[i--] = '0' + (number % 10);
+        number /= 10;
+        if (number == 0)
+            break;
     }
     write(1, buf, NUMBER_BUFFER_SIZE);
 }
