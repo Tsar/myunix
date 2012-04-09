@@ -17,9 +17,10 @@ typedef struct BucketStruct {
     pthread_t creatorThreadId;
 } Bucket;
 
-Bucket* globalBigBucketList;
-int gbListSize = 0;
-pthread_mutex_t gbListMutex;
+//global big buckets list
+Bucket* gbbList;
+int gbbListSize = 0;
+pthread_mutex_t gbbListMutex;
 
 typedef struct ThreadInfoStruct {
     pthread_t threadId;
@@ -141,18 +142,18 @@ void destroyThreadInfoList(ThreadInfo* tInfo) {
 
 void _init() {
     pthread_mutex_init(&threadInfoMutex, 0);
-    pthread_mutex_init(&gbListMutex, 0);
+    pthread_mutex_init(&gbbListMutex, 0);
 }
 
 void _fini() {
     pthread_mutex_destroy(&threadInfoMutex);
-    pthread_mutex_destroy(&gbListMutex);
+    pthread_mutex_destroy(&gbbListMutex);
 
     int i;
     for (i = 0; i < HASHMAP_SIZE; ++i)
         destroyThreadInfoList(threadInfo[i]);
 
-    destroyBucketList(globalBigBucketList);
+    destroyBucketList(gbbList);
 }
 
 void* malloc(size_t size) {
@@ -166,12 +167,12 @@ void* malloc(size_t size) {
             pthread_mutex_unlock(&tInfo->bbListMutex);
             return bb->ptr;
         }
-        bb = searchBucketInList(globalBigBucketList, size);
+        bb = searchBucketInList(gbbList, size);
         if (bb != 0) {
-            pthread_mutex_lock(&gbListMutex);
-            deleteBucketFromList(bb, &globalBigBucketList);
-            --gbListSize;
-            pthread_mutex_unlock(&gbListMutex);
+            pthread_mutex_lock(&gbbListMutex);
+            deleteBucketFromList(bb, &gbbList);
+            --gbbListSize;
+            pthread_mutex_unlock(&gbbListMutex);
             return bb->ptr;
         }
         bb = createNewBucket(size);
@@ -203,7 +204,7 @@ void free(void* ptr) {
         ++tInfo->bbListSize;
         pthread_mutex_unlock(&tInfo->bbListMutex);
         if (tInfo->bbListSize >= MAX_BB_LIST_SIZE) {
-            //I think, it's better to move out (to globalBigBucketList) NOT curBucket,
+            //I think, it's better to move out (to gbbList) NOT curBucket,
             //because there can be smaller buckets holding place in list, so we will alloc and free bigger bucket every time.
             //Moving out smallest bucket is also a bad idea: this means, that sum size of buckets in list will only increase.
             //So I'll take the last bucket in list (adding to list adds to front, so that's a kind of a queue).
@@ -213,16 +214,16 @@ void free(void* ptr) {
             --tInfo->bbListSize;
             pthread_mutex_unlock(&tInfo->bbListMutex);
 
-            pthread_mutex_lock(&gbListMutex);
-            addBucketToList(toMoveToGlobalBBList, &globalBigBucketList);
-            ++gbListSize;
-            pthread_mutex_unlock(&gbListMutex);
-            if (gbListSize >= MAX_GB_LIST_SIZE) {
-                pthread_mutex_lock(&gbListMutex);
-                Bucket* toDestroy = getLastBucketInList(globalBigBucketList);
-                deleteBucketFromList(toDestroy, &globalBigBucketList);
-                --gbListSize;
-                pthread_mutex_unlock(&gbListMutex);
+            pthread_mutex_lock(&gbbListMutex);
+            addBucketToList(toMoveToGlobalBBList, &gbbList);
+            ++gbbListSize;
+            pthread_mutex_unlock(&gbbListMutex);
+            if (gbbListSize >= MAX_GB_LIST_SIZE) {
+                pthread_mutex_lock(&gbbListMutex);
+                Bucket* toDestroy = getLastBucketInList(gbbList);
+                deleteBucketFromList(toDestroy, &gbbList);
+                --gbbListSize;
+                pthread_mutex_unlock(&gbbListMutex);
 
                 destroyBucket(toDestroy);
             }
