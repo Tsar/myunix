@@ -24,15 +24,12 @@ void test01() {
 }
 
 void test02() {
-    void* a = malloc(20);
-    printf("a = %08X\n", (size_t)a);
-    free(a);
-    a = malloc(20);
-    printf("a = %08X\n", (size_t)a);
-    free(a);
-    a = malloc(20);
-    printf("a = %08X\n", (size_t)a);
-    free(a);
+    int i;
+    for (i = 0; i < 400; ++i) {
+        void* a = malloc(256);
+        //printf("a = 0x%.8X\n", (size_t)a);
+        free(a);
+    }
 }
 
 int main() {

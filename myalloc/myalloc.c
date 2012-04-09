@@ -202,18 +202,20 @@ void* malloc(size_t size) {
             deleteBucketFromList(bb, &tInfo->bbList, &tInfo->bbListTail);
             --tInfo->bbListSize;
             pthread_mutex_unlock(&tInfo->bbListMutex);
-            return bb->ptr;
+            res = bb->ptr;
+        } else {
+            bb = searchBucketInList(gbbList, size);
+            if (bb != 0) {
+                pthread_mutex_lock(&gbbListMutex);
+                deleteBucketFromList(bb, &gbbList, &gbbListTail);
+                --gbbListSize;
+                pthread_mutex_unlock(&gbbListMutex);
+                res = bb->ptr;
+            } else {
+                bb = createNewBucket(size);
+                res = bb->ptr;
+            }
         }
-        bb = searchBucketInList(gbbList, size);
-        if (bb != 0) {
-            pthread_mutex_lock(&gbbListMutex);
-            deleteBucketFromList(bb, &gbbList, &gbbListTail);
-            --gbbListSize;
-            pthread_mutex_unlock(&gbbListMutex);
-            return bb->ptr;
-        }
-        bb = createNewBucket(size);
-        res = bb->ptr;
     } else {
         Bucket* sb = searchBucketInList(tInfo->sbList, size);
         if (sb != 0) {
@@ -221,10 +223,11 @@ void* malloc(size_t size) {
             deleteBucketFromList(sb, &tInfo->sbList, &tInfo->sbListTail);
             --tInfo->sbListSize;
             pthread_mutex_unlock(&tInfo->sbListMutex);
-            return sb->ptr;
+            res = sb->ptr;
+        } else {
+            sb = createNewBucket(size);
+            res = sb->ptr;
         }
-        sb = createNewBucket(size);
-        res = sb->ptr;
     }
 
 #ifdef DEBUG_OUTPUT
