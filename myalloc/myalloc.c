@@ -51,7 +51,7 @@ pthread_mutex_t threadInfoMutex;
 
 #include <fcntl.h>
 
-#define NUMBER_BUFFER_SIZE 12
+#define NUMBER_BUFFER_SIZE 24
 
 int debugOutputLineNumber = 0;
 
@@ -299,7 +299,7 @@ void free(void* ptr) {
         addBucketToList(curBucket, &tInfo->bbList, &tInfo->bbListTail);
         ++tInfo->bbListSize;
         pthread_mutex_unlock(&tInfo->bbListMutex);
-        if (tInfo->bbListSize >= MAX_BB_LIST_SIZE) {
+        if (tInfo->bbListSize > MAX_BB_LIST_SIZE) {
             //I think, it's better to move out (to gbbList) NOT curBucket,
             //because there can be smaller buckets holding place in list, so we will alloc and free bigger bucket every time.
             //Moving out smallest bucket is also a bad idea: this means, that sum size of buckets in list will only increase.
@@ -314,7 +314,7 @@ void free(void* ptr) {
             addBucketToList(toMoveToGlobalBBList, &gbbList, &gbbListTail);
             ++gbbListSize;
             pthread_mutex_unlock(&gbbListMutex);
-            if (gbbListSize >= MAX_GB_LIST_SIZE) {
+            if (gbbListSize > MAX_GB_LIST_SIZE) {
                 pthread_mutex_lock(&gbbListMutex);
                 Bucket* toDestroy = gbbListTail;
                 deleteBucketFromList(toDestroy, &gbbList, &gbbListTail);
@@ -331,7 +331,7 @@ void free(void* ptr) {
         addBucketToList(curBucket, &tInfo->sbList, &tInfo->sbListTail);
         ++tInfo->sbListSize;
         pthread_mutex_unlock(&tInfo->sbListMutex);
-        if (tInfo->sbListSize >= MAX_SB_LIST_SIZE) {
+        if (tInfo->sbListSize > MAX_SB_LIST_SIZE) {
             pthread_mutex_lock(&tInfo->sbListMutex);
             Bucket* toDestroy = tInfo->sbListTail;
             deleteBucketFromList(toDestroy, &tInfo->sbList, &tInfo->sbListTail);
