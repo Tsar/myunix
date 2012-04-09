@@ -353,7 +353,6 @@ void* realloc(void* ptr, size_t size) {
     write(1, ")\n", 2);
 #endif
 
-    /*
     //Note: I could just write [free(ptr); return malloc(size);] and if current bucket is enough size, than malloc will give it again,
     //because it will be in front of the buckets list and searchBucketInList works from list's front. But to optimize and get rid of few
     //instructions, which put bucket to front of the list and than take it from there again (everything O(1)), I do a custom check.
@@ -361,8 +360,14 @@ void* realloc(void* ptr, size_t size) {
         return malloc(size);
     if (((Bucket*)(ptr - sizeof(Bucket)))->size >= size)
         return ptr;
-    */
 
     free(ptr);
     return malloc(size);
+}
+
+void* memset(void* ptr, int value, size_t num);
+
+void* calloc(size_t num, size_t size) {
+    void* res = malloc(num * size);
+    return memset(res, 0, num * size);
 }
