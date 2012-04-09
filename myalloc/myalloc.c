@@ -32,13 +32,13 @@ typedef struct ThreadInfoStruct {
     struct ThreadInfoStruct* next;
 } ThreadInfo;
 
-ThreadInfo* threadInfo[HASHMAP_SIZE];
+ThreadInfo* threadInfo[HASHMAP_SIZE] = {};
 
 pthread_mutex_t threadInfoMutex;
 
 ThreadInfo* getThreadInfo(pthread_t tId) {
     ThreadInfo* tInfo = threadInfo[tId % HASHMAP_SIZE];
-    while (tInfo != 0 || tInfo->threadId != tId)
+    while (tInfo != 0 && tInfo->threadId != tId)
         tInfo = tInfo->next;
     if (tInfo == 0) {
         tInfo = (ThreadInfo*)mmap(0, sizeof(ThreadInfo), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
