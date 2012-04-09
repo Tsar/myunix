@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main() {
+void test01() {
     unsigned char* buf = (unsigned char*)malloc(500);
 
     int i;
@@ -21,6 +21,23 @@ int main() {
     }
 
     free(buf);
+}
+
+void test02() {
+    void* a = malloc(20);
+    printf("a = %08X\n", (size_t)a);
+    free(a);
+    a = malloc(20);
+    printf("a = %08X\n", (size_t)a);
+    free(a);
+    a = malloc(20);
+    printf("a = %08X\n", (size_t)a);
+    free(a);
+}
+
+int main() {
+    test01();
+    test02();
 
     return 0;
 }
