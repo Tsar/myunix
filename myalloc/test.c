@@ -9,13 +9,16 @@ int main() {
         buf[i] = i % 0xFF;
     for (i = 500 - 1; i >= 0; --i)
         printf("%d ", buf[i]);
+    printf("\n");
     
-    buf = (unsigned char*)realloc(buf, 30000);
+    buf = (unsigned char*)realloc(buf, 38400);
     
-    for (i = 0; i < 30000; ++i)
+    for (i = 0; i < 38400; ++i)
         buf[i] = (50 + i) % 0xFF;
-    for (i = 30000 - 1; i >= 0; --i)
-        printf((buf[i] == (50 + i) % 0xFF) ? "+" : "FUCK");
+    for (i = 38400 - 1; i >= 0; --i) {
+        if (buf[i] != (50 + i) % 0xFF)
+            printf("BIG FUCK\n");
+    }
 
     free(buf);
 
