@@ -45,13 +45,46 @@ ThreadInfo* threadInfo[HASHMAP_SIZE] = {};
 
 pthread_mutex_t threadInfoMutex;
 
+//#define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+
+#include <fcntl.h>
+
+#define NUMBER_BUFFER_SIZE 12
+
+void writeNumber(size_t number, int bufLen) {
+    char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+    int i = bufLen - 1;
+    while (i >= 0) {
+        buf[i--] = '0' + (number % 10);
+        number /= 10;
+        if (number == 0)
+            break;
+    }
+    write(1, buf, bufLen);
+}
+
+void writeThreadId() {
+    write(1, "thread[", 7);
+    writeNumber(pthread_self(), NUMBER_BUFFER_SIZE);
+    write(1, "]: ", 3);
+}
+
+#endif
+
 ThreadInfo* getThreadInfo(pthread_t tId) {
     ThreadInfo* tInfo = threadInfo[tId % HASHMAP_SIZE];
     while (tInfo != 0 && tInfo->threadId != tId)
         tInfo = tInfo->next;
     if (tInfo == 0) {
         tInfo = (ThreadInfo*)mmap(0, sizeof(ThreadInfo), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    
+#ifdef DEBUG_OUTPUT
+        if (tInfo == MAP_FAILED) {
+            writeThreadId();
+            write(1, "mmap failed, crash coming...\n", 29);
+        }
+#endif
         tInfo->threadId = tId;
         tInfo->bbList = 0;
         tInfo->bbListTail = 0;
@@ -71,25 +104,7 @@ ThreadInfo* getThreadInfo(pthread_t tId) {
     return tInfo;
 }
 
-#define DEBUG_OUTPUT
-
 #ifdef DEBUG_OUTPUT
-
-#include <fcntl.h>
-
-#define NUMBER_BUFFER_SIZE 12
-
-void writeNumber(size_t number, int bufLen) {
-    char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
-    int i = bufLen - 1;
-    while (i >= 0) {
-        buf[i--] = '0' + (number % 10);
-        number /= 10;
-        if (number == 0)
-            break;
-    }
-    write(1, buf, bufLen);
-}
 
 void writeThreadInfo() {
     pthread_t tId = pthread_self();
@@ -149,6 +164,12 @@ void deleteBucketFromList(Bucket* b, Bucket** bList, Bucket** bListTail) {
 
 Bucket* createNewBucket(size_t size) {
     Bucket* b = (Bucket*)mmap(0, sizeof(Bucket) + size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#ifdef DEBUG_OUTPUT
+    if (b == MAP_FAILED) {
+        writeThreadInfo();
+        write(1, "mmap failed, crash coming...\n", 29);
+    }
+#endif
     b->ptr = ((void*)b) + sizeof(Bucket);
     b->size = size;
     b->next = 0;
