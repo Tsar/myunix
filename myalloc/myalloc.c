@@ -77,7 +77,8 @@ void addBucketToList(Bucket* b, Bucket** bList) {
 void deleteBucketFromList(Bucket* b, Bucket** bList) {
     if (b == *bList) {
         *bList = b->next;
-        b->next->prev = 0;
+        if (b->next != 0)
+            b->next->prev = 0;
         b->next = 0;
         return;
     }
@@ -185,6 +186,9 @@ void* malloc(size_t size) {
 }
 
 void free(void* ptr) {
+    if (ptr == 0)
+        return;
+
     Bucket* curBucket = (Bucket*)(ptr - sizeof(Bucket));
     if (curBucket->size >= N) {
         ThreadInfo* tInfo = getThreadInfo(pthread_self());
