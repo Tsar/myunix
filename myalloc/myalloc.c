@@ -45,6 +45,33 @@ ThreadInfo* threadInfo[HASHMAP_SIZE] = {};
 
 pthread_mutex_t threadInfoMutex;
 
+#define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+
+#include <fcntl.h>
+
+#define NUMBER_BUFFER_SIZE 12
+
+void writeNumber(size_t number) {
+    char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+    int i = NUMBER_BUFFER_SIZE - 1;
+    if (number == 0) {
+        buf[i--] = 'O';
+        buf[i--] = 'R';
+        buf[i--] = 'E';
+        buf[i--] = 'Z';
+    } else {
+        while (i >= 0 && number % 10 > 0) {
+            buf[i--] = '0' + (number % 10);
+            number /= 10;
+        }
+    }
+    write(1, buf, NUMBER_BUFFER_SIZE);
+}
+
+#endif
+
 ThreadInfo* getThreadInfo(pthread_t tId) {
     ThreadInfo* tInfo = threadInfo[tId % HASHMAP_SIZE];
     while (tInfo != 0 && tInfo->threadId != tId)
@@ -166,6 +193,7 @@ void _fini() {
 
 void* malloc(size_t size) {
     ThreadInfo* tInfo = getThreadInfo(pthread_self());
+    void* res;
     if (size >= N) {
         Bucket* bb = searchBucketInList(tInfo->bbList, size);
         if (bb != 0) {
@@ -184,7 +212,7 @@ void* malloc(size_t size) {
             return bb->ptr;
         }
         bb = createNewBucket(size);
-        return bb->ptr;
+        res = bb->ptr;
     } else {
         Bucket* sb = searchBucketInList(tInfo->sbList, size);
         if (sb != 0) {
@@ -195,13 +223,29 @@ void* malloc(size_t size) {
             return sb->ptr;
         }
         sb = createNewBucket(size);
-        return sb->ptr;
+        res = sb->ptr;
     }
+
+#ifdef DEBUG_OUTPUT
+    write(1, " malloc(", 8);
+    writeNumber(size);
+    write(1, ") = ", 4);
+    writeNumber((size_t)res);
+    write(1, "\n", 1);
+#endif
+
+    return res;
 }
 
 void free(void* ptr) {
     if (ptr == 0)
         return;
+
+#ifdef DEBUG_OUTPUT
+    write(1, "   free(", 8);
+    writeNumber((size_t)ptr);
+    write(1, ")\n", 2);
+#endif
 
     Bucket* curBucket = (Bucket*)(ptr - sizeof(Bucket));
     if (curBucket->size >= N) {
@@ -256,6 +300,14 @@ void free(void* ptr) {
 }
 
 void* realloc(void* ptr, size_t size) {
+#ifdef DEBUG_OUTPUT
+    write(1, "realloc(", 8);
+    writeNumber((size_t)ptr);
+    write(1, ", ", 2);
+    writeNumber(size);
+    write(1, ")\n", 2);
+#endif
+
     /*
     //Note: I could just write [free(ptr); return malloc(size);] and if current bucket is enough size, than malloc will give it again,
     //because it will be in front of the buckets list and searchBucketInList works from list's front. But to optimize and get rid of few
