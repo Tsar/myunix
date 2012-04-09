@@ -45,6 +45,8 @@ ThreadInfo* threadInfo[HASHMAP_SIZE] = {};
 
 pthread_mutex_t threadInfoMutex;
 
+void* memset(void* ptr, int value, size_t num);
+
 //#define DEBUG_OUTPUT
 
 #ifdef DEBUG_OUTPUT
@@ -56,7 +58,8 @@ pthread_mutex_t threadInfoMutex;
 int debugOutputLineNumber = 0;
 
 void writeNumber(size_t number, int bufLen) {
-    char buf[NUMBER_BUFFER_SIZE] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+    char buf[NUMBER_BUFFER_SIZE];
+    memset(buf, ' ', NUMBER_BUFFER_SIZE);
     int i = bufLen - 1;
     while (i >= 0) {
         buf[i--] = '0' + (number % 10);
@@ -364,8 +367,6 @@ void* realloc(void* ptr, size_t size) {
     free(ptr);
     return malloc(size);
 }
-
-void* memset(void* ptr, int value, size_t num);
 
 void* calloc(size_t num, size_t size) {
     void* res = malloc(num * size);
