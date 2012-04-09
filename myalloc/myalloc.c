@@ -65,6 +65,12 @@ void writeNumber(size_t number) {
     write(1, buf, NUMBER_BUFFER_SIZE);
 }
 
+void writeThreadId() {
+    write(1, "thread[", 7);
+    writeNumber(pthread_self());
+    write(1, "]: ", 3);
+}
+
 #endif
 
 ThreadInfo* getThreadInfo(pthread_t tId) {
@@ -222,7 +228,8 @@ void* malloc(size_t size) {
     }
 
 #ifdef DEBUG_OUTPUT
-    write(1, " malloc(", 8);
+    writeThreadId();
+    write(1, "malloc (", 8);
     writeNumber(size);
     write(1, ") = ", 4);
     writeNumber((size_t)res);
@@ -237,7 +244,8 @@ void free(void* ptr) {
         return;
 
 #ifdef DEBUG_OUTPUT
-    write(1, "   free(", 8);
+    writeThreadId();
+    write(1, "free   (", 8);
     writeNumber((size_t)ptr);
     write(1, ")\n", 2);
 #endif
@@ -296,6 +304,7 @@ void free(void* ptr) {
 
 void* realloc(void* ptr, size_t size) {
 #ifdef DEBUG_OUTPUT
+    writeThreadId();
     write(1, "realloc(", 8);
     writeNumber((size_t)ptr);
     write(1, ", ", 2);
