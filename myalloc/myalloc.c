@@ -364,7 +364,7 @@ void* realloc(void* ptr, size_t size) {
         return 0;
     }
     size_t oldSize = ((Bucket*)(ptr - sizeof(Bucket)))->size;
-    if (oldSize >= size && ((oldSize >= N && size >= N) || (oldSize < N && size < N)))
+    if (oldSize >= size && (size >= N || oldSize < N))
         return ptr;
 
     void* res = malloc(size);
