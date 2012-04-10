@@ -45,6 +45,7 @@ ThreadInfo* threadInfo[HASHMAP_SIZE] = {};
 
 pthread_mutex_t threadInfoMutex;
 
+void* memcpy(void* destination, const void* source, size_t num);
 void* memset(void* ptr, int value, size_t num);
 
 //#define DEBUG_OUTPUT
@@ -356,16 +357,20 @@ void* realloc(void* ptr, size_t size) {
     write(1, ")\n", 2);
 #endif
 
-    //Note: I could just write [free(ptr); return malloc(size);] and if current bucket is enough size, than malloc will give it again,
-    //because it will be in front of the buckets list and searchBucketInList works from list's front. But to optimize and get rid of few
-    //instructions, which put bucket to front of the list and than take it from there again (everything O(1)), I do a custom check.
     if (ptr == 0)
         return malloc(size);
-    if (((Bucket*)(ptr - sizeof(Bucket)))->size >= size)
+    if (size == 0) {
+        free(ptr);
+        return 0;
+    }
+    size_t oldSize = ((Bucket*)(ptr - sizeof(Bucket)))->size;
+    if (oldSize >= size && ((oldSize >= N && size >= N) || (oldSize < N && size < N)))
         return ptr;
 
+    void* res = malloc(size);
+    memcpy(res, ptr, oldSize < size ? oldSize : size);
     free(ptr);
-    return malloc(size);
+    return res;
 }
 
 void* calloc(size_t num, size_t size) {
