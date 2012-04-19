@@ -2,6 +2,8 @@
 
 #define K 10
 
+void* memmove(void* destination, const void* source, size_t num);
+
 void reverseBuffer(char* buffer, int len) {
     int i, mid = len / 2;
     for (i = 0; i < mid; ++i) {
