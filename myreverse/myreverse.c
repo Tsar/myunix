@@ -41,14 +41,12 @@ int main() {
                 len -= (x + 1);
             } else {
                 reverseBuffer(buf, x);
-                if (x > 0) {
-                    int n2 = 0;
-                    while (n2 < x + 1) {
-                        int n2Delta = write(1, buf + n2, x + 1 - n2);
-                        if (n2Delta == -1)
-                            return -1;
-                        n2 += n2Delta;
-                    }
+                int n2 = 0;
+                while (n2 < x + 1) {
+                    int n2Delta = write(1, buf + n2, x + 1 - n2);
+                    if (n2Delta == -1)
+                        return -1;
+                    n2 += n2Delta;
                 }
                 memmove(buf, buf + (x + 1), len - (x - 1));
                 len -= (x + 1);
