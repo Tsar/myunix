@@ -22,9 +22,9 @@ int main() {
         int n = read(0, buf + len, K - len);
         if (n < 0)
             return -1;
-        if (n == 0)
-            break;
         len += n;
+        if (len == 0)
+            break;
         
         int x;
         for (x = 0; x < len && buf[x] != '\n'; ++x);
