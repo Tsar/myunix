@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -7,40 +8,64 @@
 void* malloc(size_t size);
 void* memset(void* ptr, int value, size_t num);
 
-typedef struct {
-    int portNumber;
-    int socketDescriptor_ipv4;
-    struct sockaddr_in servAddr_ipv4;
-    int socketDescriptor_ipv6;
-    struct sockaddr_in servAddr_ipv6;
-} PortInfo;
-
 void error(const char* msg) {
     perror(msg);
     exit(1);
 }
 
-int main(int argc, char* argv[]) {
-    PortInfo* ports = malloc(sizeof(PortInfo) * (argc - 1));
-    int i;
-    for (i = 0; i < argc - 1; ++i) {
-        ports[i].portNumber = atoi(argv[i + 1]);
+typedef struct {
+    int portNumber;
+    int ipv6;
+    pthread_t threadId;
+} AcceptorThreadInfo;
 
-        ports[i].socketDescriptor_ipv4 = socket(AF_INET, SOCK_STREAM, 0);
-        if (ports[i].socketDescriptor_ipv4 < 0)
-            error("ERROR: Could not create socket [IPv4]");
-        memset(&ports[i].servAddr_ipv4, 0, sizeof(ports[i].servAddr_ipv4));
-        ports[i].servAddr_ipv4.sin_family = AF_INET;
-        ports[i].servAddr_ipv4.sin_addr.s_addr = INADDR_ANY;
-        ports[i].servAddr_ipv4.sin_port = htons(ports[i].portNumber);
-        if (bind(ports[i].socketDescriptor_ipv4, (struct sockaddr*)&ports[i].servAddr_ipv4, sizeof(ports[i].servAddr_ipv4)) < 0)
-            error("ERROR: Could not bind socket [IPv4]");
-        if (listen(ports[i].socketDescriptor_ipv4, 5) < 0)
-            error("ERROR: Could not start listening on socket [IPv4]");
-        //accept
+statisc void* threadAcceptor(void* acceptorArgs) {
+    AcceptorThreadArgs* aa = (AcceptorThreadArgs*)acceptorArgs;
+
+    int socketDescriptor = socket(aa->ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
+    if (socketDescriptor < 0)
+        error("ERROR: Could not create socket");
+    struct sockaddr_in servAddr;
+    struct sockaddr_in6 servAddr6;
+    if (aa->ipv6) {
+        memset(&servAddr6, 0, sizeof(servAddr6));
+        servAddr6.sin_family = AF_INET6;
+        servAddr6.sin_addr.s_addr = INADDR_ANY;
+        servAddr6.sin_port = htons(aa->portNumber);
+    } else {
+        memset(&servAddr, 0, sizeof(servAddr));
+        servAddr.sin_family = AF_INET;
+        servAddr.sin_addr.s_addr = INADDR_ANY;
+        servAddr.sin_port = htons(aa->portNumber);
     }
-    
-    free(ports);
+    if (bind(socketDescriptor, (struct sockaddr*)(aa->ipv6 ? servAddr6 : servAddr), sizeof(aa->ipv6 ? servAddr6 : servAddr)) < 0)
+        error("ERROR: Could not bind socket");
+    if (listen(socketDescriptor, 10) < 0)
+        error("ERROR: Could not start listening on socket");
+    while (1) {
+        int acSocketDescriptor = accept(socketDescriptor, );
+    }
+}
+
+int main(int argc, char* argv[]) {
+    int n = argc - 1;
+    AcceptorThreadInfo* atis = malloc(2 * n * sizeof(AcceptorThreadInfo));
+    int i;
+    for (i = 0; i < n; ++i) {
+        atis[2 * i].portNumber = atis[2 * i + 1].portNumber = atoi(argv[i + 1));
+        atis[2 * i].ipv6 = 0;
+        atis[2 * i + 1].ipv6 = 1;
+    }
+    for (i = 0; i < 2 * n; ++i) {
+        if (pthread_create(&atis[i].threadId, NULL, threadAcceptor, (void*)atis[i]) != 0)
+            error("ERROR: Could not create acceptor thread");
+    }
+    //for (i = 0; i < 2 * n; ++i) {
+        if (pthread_join(atis[0 /* i */].threadId, NULL) != 0)
+            error("ERROR: Could not join to acceptor thread");
+    //}
+
+    free(atis);
 
     return 0;
 }
