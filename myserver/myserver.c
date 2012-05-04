@@ -19,8 +19,8 @@ typedef struct {
     pthread_t threadId;
 } AcceptorThreadInfo;
 
-statisc void* threadAcceptor(void* acceptorArgs) {
-    AcceptorThreadArgs* aa = (AcceptorThreadArgs*)acceptorArgs;
+static void* threadAcceptor(void* acceptorArgs) {
+    AcceptorThreadInfo* aa = (AcceptorThreadInfo*)acceptorArgs;
 
     int socketDescriptor = socket(aa->ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
     if (socketDescriptor < 0)
@@ -29,21 +29,27 @@ statisc void* threadAcceptor(void* acceptorArgs) {
     struct sockaddr_in6 servAddr6;
     if (aa->ipv6) {
         memset(&servAddr6, 0, sizeof(servAddr6));
-        servAddr6.sin_family = AF_INET6;
-        servAddr6.sin_addr.s_addr = INADDR_ANY;
-        servAddr6.sin_port = htons(aa->portNumber);
+        servAddr6.sin6_family = AF_INET6;
+        servAddr6.sin6_port = htons(aa->portNumber);
+        servAddr6.sin6_addr = in6addr_any;
     } else {
         memset(&servAddr, 0, sizeof(servAddr));
         servAddr.sin_family = AF_INET;
         servAddr.sin_addr.s_addr = INADDR_ANY;
         servAddr.sin_port = htons(aa->portNumber);
     }
-    if (bind(socketDescriptor, (struct sockaddr*)(aa->ipv6 ? servAddr6 : servAddr), sizeof(aa->ipv6 ? servAddr6 : servAddr)) < 0)
+    if (bind(socketDescriptor, aa->ipv6 ? (struct sockaddr*)&servAddr6 : (struct sockaddr*)&servAddr, aa->ipv6 ? sizeof(servAddr6) : sizeof(servAddr)) < 0)
         error("ERROR: Could not bind socket");
     if (listen(socketDescriptor, 10) < 0)
         error("ERROR: Could not start listening on socket");
     while (1) {
-        int acSocketDescriptor = accept(socketDescriptor, );
+        struct sockaddr_in cliAddr;
+        struct sockaddr_in6 cliAddr6;
+        socklen_t cliAddrLen;
+        int acSocketDescriptor = accept(socketDescriptor, aa->ipv6 ? (struct sockaddr*)&cliAddr6 : (struct sockaddr*)&cliAddr, &cliAddrLen);
+        if (acSocketDescriptor < 0)
+            error("ERROR: Error on accepting");
+        
     }
 }
 
@@ -52,12 +58,12 @@ int main(int argc, char* argv[]) {
     AcceptorThreadInfo* atis = malloc(2 * n * sizeof(AcceptorThreadInfo));
     int i;
     for (i = 0; i < n; ++i) {
-        atis[2 * i].portNumber = atis[2 * i + 1].portNumber = atoi(argv[i + 1));
+        atis[2 * i].portNumber = atis[2 * i + 1].portNumber = atoi(argv[i + 1]);
         atis[2 * i].ipv6 = 0;
         atis[2 * i + 1].ipv6 = 1;
     }
     for (i = 0; i < 2 * n; ++i) {
-        if (pthread_create(&atis[i].threadId, NULL, threadAcceptor, (void*)atis[i]) != 0)
+        if (pthread_create(&atis[i].threadId, NULL, threadAcceptor, (void*)&atis[i]) != 0)
             error("ERROR: Could not create acceptor thread");
     }
     //for (i = 0; i < 2 * n; ++i) {
