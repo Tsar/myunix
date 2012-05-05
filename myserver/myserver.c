@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <poll.h>
 #include <sys/unistd.h>
 #include <sys/fcntl.h>
 #include <sys/types.h>
@@ -10,6 +11,8 @@
 
 void* malloc(size_t size);
 void* memset(void* ptr, int value, size_t num);
+
+#define MAX_CHAT_MSG_LEN 21
 
 void error(const char* msg) {
     perror(msg);
@@ -35,7 +38,19 @@ static void* threadSend(void* talkerThreadInfo) {
 
 static void* threadRecv(void* talkerThreadInfo) {
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
-    
+    struct pollfd pfd;
+    pfd.fd = tti->socketDescriptor;
+    pfd.events = POLLIN;
+    while (1) {
+        if (poll(&pfd, 1, -1) < 0)
+            error("ERROR: poll crashed");
+        if (pfd.revents & POLLIN) {
+            char buf[MAX_CHAT_MSG_LEN];
+            int n = recv(tti->socketDescriptor, buf, MAX_CHAT_MSG_LEN, 0);
+            if (n > 0)
+                printf("[%s]\n", buf);
+        }
+    }
 }
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
@@ -72,7 +87,7 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
         int acSocketDescriptor = accept(socketDescriptor, ati->ipv6 ? (struct sockaddr*)&cliAddr6 : (struct sockaddr*)&cliAddr, &cliAddrLen);
         if (acSocketDescriptor < 0)
             error("ERROR: Error on accepting");
-        if (fcntl(s, F_SETFL, O_NONBLOCK) < 0)
+        if (fcntl(acSocketDescriptor, F_SETFL, O_NONBLOCK) < 0)
             error("ERROR: fcntl failed");
 
         char cliAddrAsStr[INET6_ADDRSTRLEN];
