@@ -16,6 +16,8 @@ void* memcpy(void* destination, const void* source, size_t num);
 #define MAX_CHAT_MSG_LEN  21
 #define MSG_QUEUE_SIZE    10000
 
+#define DEBUG_OUTPUT
+
 typedef struct {
     char msg[MAX_CHAT_MSG_LEN];
     int msgLen;
@@ -32,9 +34,11 @@ MsgQueueHead* msgQueueHeads;
 int msgQueueHeadsCount;
 int msgQueueHeadsCapacity;
 int msgQueueTail;
+pthread_cond_t msgQueueTailChange;
 
 void initMsgQueue() {
     pthread_mutex_init(&msgQueueMutex, 0);
+    pthread_cond_init(&msgQueueTailChange, 0);
     msgQueueTail = 0;
     msgQueueHeadsCount = 0;
     msgQueueHeadsCapacity = 2 * sizeof(MsgQueueHead);
@@ -46,8 +50,39 @@ void destroyMsgQueue() {
     for (i = 0; i < msgQueueHeadsCount; ++i)
         pthread_mutex_destroy(&msgQueueHeads[i].mutex);
     free(msgQueueHeads);
+    pthread_cond_destroy(&msgQueueTailChange);
     pthread_mutex_destroy(&msgQueueMutex);
 }
+
+#ifdef DEBUG_OUTPUT
+
+void printMyString(const char* str, int len) {
+    char copiedStr[MAX_CHAT_MSG_LEN];
+    memcpy(copiedStr, str, len - 1);
+    copiedStr[len - 1] = 0;
+    printf("%s", copiedStr);
+}
+
+void printAllQueues() {
+    printf("====\n");
+    int i;
+    for (i = 0; i < msgQueueHeadsCount; ++i) {
+        printf("Q[%d]:", i);
+        if (msgQueueHeads[i].head == msgQueueTail)
+            printf("empty");
+        else {
+            int j;
+            for (j = msgQueueHeads[i].head; j != msgQueueTail; j = (j + 1) % MSG_QUEUE_SIZE) {
+                printf("{");
+                printMyString(msgQueueData[j].msg, msgQueueData[j].msgLen);
+                printf("}");
+            }
+        }
+        printf("\n");
+    }
+}
+
+#endif
 
 void addToMsgQueue(const char* msg, int msgLen) {
     pthread_mutex_lock(&msgQueueMutex);
@@ -62,7 +97,11 @@ void addToMsgQueue(const char* msg, int msgLen) {
     memcpy(msgQueueData[msgQueueTail].msg, msg, msgLen);
     msgQueueData[msgQueueTail].msgLen = msgLen;
     msgQueueTail = (msgQueueTail + 1) % MSG_QUEUE_SIZE;
+#ifdef DEBUG_OUTPUT
+    printAllQueues();
+#endif
     pthread_mutex_unlock(&msgQueueMutex);
+    pthread_cond_broadcast(&msgQueueTailChange);
 }
 
 MsgQueueHead* createNewMsgQueueHead() {
@@ -95,47 +134,41 @@ typedef struct {
     pthread_t threadId;
 } AcceptorThreadInfo;
 
-#define DEBUG_OUTPUT
-
-#ifdef DEBUG_OUTPUT
-void printMyString(const char* str, int len) {
-    char copiedStr[MAX_CHAT_MSG_LEN];
-    memcpy(copiedStr, str, len - 1);
-    copiedStr[len - 1] = 0;
-    printf("%s", copiedStr);
-}
-#endif
-
 static void* threadSend(void* talkerThreadInfo) {
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
     struct pollfd pfd;
     pfd.fd = tti->socketDescriptor;
     pfd.events = POLLOUT;
     MsgQueueHead* msgQueueHead = createNewMsgQueueHead();
+    pthread_mutex_t myMutex;
+    pthread_mutex_init(&myMutex, 0);
     while (1) {
-        while (msgQueueHead->head == msgQueueTail);
-        if (poll(&pfd, 1, -1) < 0)
-            error("ERROR: poll crashed [sender thread]");
-        if (pfd.revents & POLLOUT) {
-            int n2 = 0;
-            MsgQueueElement* mqe = &msgQueueData[msgQueueHead->head];
-            while (n2 < mqe->msgLen) {
-                int n2Delta = send(tti->socketDescriptor, mqe->msg + n2, mqe->msgLen - n2, 0);
-                if (n2Delta == -1) {
-                    //thinking what to do here
+        pthread_cond_wait(&msgQueueTailChange, &myMutex);
+        while (msgQueueHead->head != msgQueueTail) {
+            if (poll(&pfd, 1, -1) < 0)
+                error("ERROR: poll crashed [sender thread]");
+            if (pfd.revents & POLLOUT) {
+                int n2 = 0;
+                MsgQueueElement* mqe = &msgQueueData[msgQueueHead->head];
+                while (n2 < mqe->msgLen) {
+                    int n2Delta = send(tti->socketDescriptor, mqe->msg + n2, mqe->msgLen - n2, 0);
+                    if (n2Delta == -1) {
+                        //thinking what to do here
+                    }
+                    n2 += n2Delta;
                 }
-                n2 += n2Delta;
-            }
-            pthread_mutex_lock(&msgQueueHead->mutex);
-            msgQueueHead->head = (msgQueueHead->head + 1) % MSG_QUEUE_SIZE;
-            pthread_mutex_unlock(&msgQueueHead->mutex);
+                pthread_mutex_lock(&msgQueueHead->mutex);
+                msgQueueHead->head = (msgQueueHead->head + 1) % MSG_QUEUE_SIZE;
+                pthread_mutex_unlock(&msgQueueHead->mutex);
 #ifdef DEBUG_OUTPUT
-            printf("[Thread: %zu] Sent: [", pthread_self());
-            printMyString(mqe->msg, mqe->msgLen);
-            printf("]\n");
+                printf("[Thread: %zu] Sent: [", pthread_self());
+                printMyString(mqe->msg, mqe->msgLen);
+                printf("]\n");
 #endif
+            }
         }
     }
+    pthread_mutex_destroy(&myMutex);
 }
 
 static void* threadRecv(void* talkerThreadInfo) {
