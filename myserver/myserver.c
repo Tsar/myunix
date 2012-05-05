@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <sys/unistd.h>
+#include <sys/fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -16,7 +18,8 @@ void error(const char* msg) {
 
 typedef struct {
     int socketDescriptor;
-    pthread_t threadId;
+    pthread_t threadSendId;
+    pthread_t threadRecvId;
 } TalkerThreadInfo;
 
 typedef struct {
@@ -25,7 +28,12 @@ typedef struct {
     pthread_t threadId;
 } AcceptorThreadInfo;
 
-static void* threadTalker(void* talkerThreadInfo) {
+static void* threadSend(void* talkerThreadInfo) {
+    TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
+    
+}
+
+static void* threadRecv(void* talkerThreadInfo) {
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
     
 }
@@ -64,6 +72,8 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
         int acSocketDescriptor = accept(socketDescriptor, ati->ipv6 ? (struct sockaddr*)&cliAddr6 : (struct sockaddr*)&cliAddr, &cliAddrLen);
         if (acSocketDescriptor < 0)
             error("ERROR: Error on accepting");
+        if (fcntl(s, F_SETFL, O_NONBLOCK) < 0)
+            error("ERROR: fcntl failed");
 
         char cliAddrAsStr[INET6_ADDRSTRLEN];
         if (inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN) == NULL)
@@ -72,8 +82,10 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
 
         TalkerThreadInfo* tti = malloc(sizeof(TalkerThreadInfo));
         tti->socketDescriptor = acSocketDescriptor;
-        if (pthread_create(&tti->threadId, NULL, threadTalker, (void*)tti) != 0)
-            error("ERROR: Could not create talker thread");
+        if (pthread_create(&tti->threadSendId, NULL, threadSend, (void*)tti) != 0)
+            error("ERROR: Could not create sender thread");
+        if (pthread_create(&tti->threadRecvId, NULL, threadRecv, (void*)tti) != 0)
+            error("ERROR: Could not create receiver thread");
     }
 }
 
