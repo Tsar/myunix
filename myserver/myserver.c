@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 void* malloc(size_t size);
 void* memset(void* ptr, int value, size_t num);
@@ -31,7 +32,12 @@ static void* threadTalker(void* talkerThreadInfo) {
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
     AcceptorThreadInfo* ati = (AcceptorThreadInfo*)acceptorThreadInfo;
-    int socketDescriptor = socket(ati->ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
+
+    //temporary disabling IPv6
+    if (ati->ipv6)
+        return;
+
+    int socketDescriptor = socket(ati->ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socketDescriptor < 0)
         error("ERROR: Could not create socket");
     struct sockaddr_in servAddr;
@@ -58,7 +64,10 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
         int acSocketDescriptor = accept(socketDescriptor, ati->ipv6 ? (struct sockaddr*)&cliAddr6 : (struct sockaddr*)&cliAddr, &cliAddrLen);
         if (acSocketDescriptor < 0)
             error("ERROR: Error on accepting");
-        //TODO: here should be IP output
+
+        char cliAddrAsStr[INET6_ADDRSTRLEN];
+        printf("Connection from <%s>\n", inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN));
+
         TalkerThreadInfo* tti = malloc(sizeof(TalkerThreadInfo));
         tti->socketDescriptor = acSocketDescriptor;
         if (pthread_create(&tti->threadId, NULL, threadTalker, (void*)tti) != 0)
