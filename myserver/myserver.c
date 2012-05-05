@@ -11,8 +11,72 @@
 
 void* malloc(size_t size);
 void* memset(void* ptr, int value, size_t num);
+void* memcpy(void* destination, const void* source, size_t num);
 
-#define MAX_CHAT_MSG_LEN 21
+#define MAX_CHAT_MSG_LEN  21
+#define MSG_QUEUE_SIZE    10000
+
+typedef struct {
+    char msg[MAX_CHAT_MSG_LEN];
+    int msgLen;
+} MsgQueueElement;
+
+typedef struct {
+    int head;
+    pthread_mutex_t mutex;
+} MsgQueueHead;
+
+MsgQueueElement msgQueueData[MSG_QUEUE_SIZE];
+pthread_mutex_t msgQueueMutex;
+MsgQueueHead* msgQueueHeads;
+int msgQueueHeadsCount;
+int msgQueueHeadsCapacity;
+int msgQueueTail;
+
+void initMsgQueue() {
+    pthread_mutex_init(&msgQueueMutex, 0);
+    msgQueueTail = 0;
+    msgQueueHeadsCount = 0;
+    msgQueueHeadsCapacity = 2 * sizeof(MsgQueueHead);
+    msgQueueHeads = malloc(msgQueueHeadsCapacity);
+}
+
+void destroyMsgQueue() {
+    int i;
+    for (i = 0; i < msgQueueHeadsCount; ++i)
+        pthread_mutex_destroy(&msgQueueHeads[i].mutex);
+    free(msgQueueHeads);
+    pthread_mutex_destroy(&msgQueueMutex);
+}
+
+void addToMsgQueue(const char* msg, int msgLen) {
+    pthread_mutex_lock(&msgQueueMutex);
+    int i;
+    for (i = 0; i < msgQueueHeadsCount; ++i) {
+        if ((msgQueueHeads[i].head + 1) % MSG_QUEUE_SIZE == msgQueueTail) {
+            pthread_mutex_lock(&msgQueueHeads[i].mutex);
+            msgQueueHeads[i].head = (msgQueueHeads[i].head + 1) % MSG_QUEUE_SIZE;  //drop message from head
+            pthread_mutex_unlock(&msgQueueHeads[i].mutex);
+        }
+    }
+    memcpy(msgQueueData[msgQueueTail].msg, msg, msgLen);
+    msgQueueData[msgQueueTail].msgLen = msgLen;
+    msgQueueTail = (msgQueueTail + 1) % MSG_QUEUE_SIZE;
+    pthread_mutex_unlock(&msgQueueMutex);
+}
+
+MsgQueueHead* createNewMsgQueueHead() {
+    pthread_mutex_lock(&msgQueueMutex);
+    ++msgQueueHeadsCount;
+    if (msgQueueHeadsCount > msgQueueHeadsCapacity) {
+        msgQueueHeadsCapacity *= 2;
+        msgQueueHeads = realloc(msgQueueHeads, msgQueueHeadsCapacity);
+    }
+    msgQueueHeads[msgQueueHeadsCount - 1].head = msgQueueTail;
+    pthread_mutex_init(&msgQueueHeads[msgQueueHeadsCount - 1].mutex, 0);
+    pthread_mutex_unlock(&msgQueueMutex);
+    return &msgQueueHeads[msgQueueHeadsCount - 1];
+}
 
 void error(const char* msg) {
     perror(msg);
@@ -33,7 +97,29 @@ typedef struct {
 
 static void* threadSend(void* talkerThreadInfo) {
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
-    
+    struct pollfd pfd;
+    pfd.fd = tti->socketDescriptor;
+    pfd.events = POLLOUT;
+    MsgQueueHead* msgQueueHead = createNewMsgQueueHead();
+    while (1) {
+        while (msgQueueHead->head == msgQueueTail);
+        if (poll(&pfd, 1, -1) < 0)
+            error("ERROR: poll crashed [sender thread]");
+        if (pfd.revents & POLLOUT) {
+            int n2 = 0;
+            MsgQueueElement* mqe = &msgQueueData[msgQueueHead->head];
+            while (n2 < mqe->msgLen) {
+                int n2Delta = send(tti->socketDescriptor, mqe->msg + n2, mqe->msgLen - n2, 0);
+                if (n2Delta == -1) {
+                    //thinking what to do here
+                }
+                n2 += n2Delta;
+            }
+            pthread_mutex_lock(&msgQueueHead->mutex);
+            msgQueueHead->head = (msgQueueHead->head + 1) % MSG_QUEUE_SIZE;
+            pthread_mutex_unlock(&msgQueueHead->mutex);
+        }
+    }
 }
 
 static void* threadRecv(void* talkerThreadInfo) {
@@ -43,12 +129,16 @@ static void* threadRecv(void* talkerThreadInfo) {
     pfd.events = POLLIN;
     while (1) {
         if (poll(&pfd, 1, -1) < 0)
-            error("ERROR: poll crashed");
+            error("ERROR: poll crashed [receiver thread]");
         if (pfd.revents & POLLIN) {
-            char buf[MAX_CHAT_MSG_LEN];
-            int n = recv(tti->socketDescriptor, buf, MAX_CHAT_MSG_LEN, 0);
-            if (n > 0)
-                printf("[%s]\n", buf);
+            char msg[MAX_CHAT_MSG_LEN];
+            int msgLen = recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0);
+            if (msgLen > 0) {
+                if (msg[msgLen - 1] != '\n')
+                    while (recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0) > 0);
+                else
+                    addToMsgQueue(msg, msgLen);
+            }
         }
     }
 }
@@ -105,6 +195,7 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
 }
 
 int main(int argc, char* argv[]) {
+    initMsgQueue();
     int n = argc - 1;
     AcceptorThreadInfo* atis = malloc(2 * n * sizeof(AcceptorThreadInfo));
     int i;
@@ -122,6 +213,7 @@ int main(int argc, char* argv[]) {
             error("ERROR: Could not join to acceptor thread");
     //}
     //free(atis);
+    //destroyMsgQueue();
 
     return 0;
 }
