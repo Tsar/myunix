@@ -66,7 +66,9 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
             error("ERROR: Error on accepting");
 
         char cliAddrAsStr[INET6_ADDRSTRLEN];
-        printf("Connection from <%s>\n", inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN));
+        if (inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN) == NULL)
+            error("ERROR: inet_ntop failed");
+        printf("Connection from <%s>\n", cliAddrAsStr);
 
         TalkerThreadInfo* tti = malloc(sizeof(TalkerThreadInfo));
         tti->socketDescriptor = acSocketDescriptor;
