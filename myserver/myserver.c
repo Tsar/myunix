@@ -95,6 +95,17 @@ typedef struct {
     pthread_t threadId;
 } AcceptorThreadInfo;
 
+#define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+void printMyString(const char* str, int len) {
+    char copiedStr[MAX_CHAT_MSG_LEN];
+    memcpy(copiedStr, str, len - 1);
+    copiedStr[len - 1] = 0;
+    printf("%s", copiedStr);
+}
+#endif
+
 static void* threadSend(void* talkerThreadInfo) {
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
     struct pollfd pfd;
@@ -118,6 +129,11 @@ static void* threadSend(void* talkerThreadInfo) {
             pthread_mutex_lock(&msgQueueHead->mutex);
             msgQueueHead->head = (msgQueueHead->head + 1) % MSG_QUEUE_SIZE;
             pthread_mutex_unlock(&msgQueueHead->mutex);
+#ifdef DEBUG_OUTPUT
+            printf("[Thread: %zu] Sent: [", pthread_self());
+            printMyString(mqe->msg, mqe->msgLen);
+            printf("]\n");
+#endif
         }
     }
 }
@@ -138,6 +154,11 @@ static void* threadRecv(void* talkerThreadInfo) {
                     while (recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0) > 0);
                 else
                     addToMsgQueue(msg, msgLen);
+#ifdef DEBUG_OUTPUT
+                    printf("[Thread: %zu] Received: [", pthread_self());
+                    printMyString(msg, msgLen);
+                    printf("]\n");
+#endif
             }
         }
     }
