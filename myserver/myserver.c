@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <poll.h>
+#include <errno.h>
 #include <sys/unistd.h>
 #include <sys/fcntl.h>
 #include <sys/types.h>
@@ -25,6 +26,7 @@ typedef struct {
 
 typedef struct {
     int head;
+    int used;
     pthread_mutex_t mutex;
 } MsgQueueHead;
 
@@ -67,6 +69,8 @@ void printAllQueues() {
     printf("====\n");
     int i;
     for (i = 0; i < msgQueueHeadsCount; ++i) {
+        if (msgQueueHeads[i].used == 0)
+            continue;
         printf("Q[%d]:", i);
         if (msgQueueHeads[i].head == msgQueueTail)
             printf("empty");
@@ -88,7 +92,7 @@ void addToMsgQueue(const char* msg, int msgLen) {
     pthread_mutex_lock(&msgQueueMutex);
     int i;
     for (i = 0; i < msgQueueHeadsCount; ++i) {
-        if ((msgQueueHeads[i].head + 1) % MSG_QUEUE_SIZE == msgQueueTail) {
+        if (msgQueueHeads[i].used && (msgQueueHeads[i].head + 1) % MSG_QUEUE_SIZE == msgQueueTail) {
             pthread_mutex_lock(&msgQueueHeads[i].mutex);
             msgQueueHeads[i].head = (msgQueueHeads[i].head + 1) % MSG_QUEUE_SIZE;  //drop message from head
             pthread_mutex_unlock(&msgQueueHeads[i].mutex);
@@ -112,6 +116,7 @@ MsgQueueHead* createNewMsgQueueHead() {
         msgQueueHeads = realloc(msgQueueHeads, msgQueueHeadsCapacity);
     }
     msgQueueHeads[msgQueueHeadsCount - 1].head = msgQueueTail;
+    msgQueueHeads[msgQueueHeadsCount - 1].used = 1;
     pthread_mutex_init(&msgQueueHeads[msgQueueHeadsCount - 1].mutex, 0);
     pthread_mutex_unlock(&msgQueueMutex);
     return &msgQueueHeads[msgQueueHeadsCount - 1];
@@ -141,10 +146,11 @@ static void* threadSend(void* talkerThreadInfo) {
     MsgQueueHead* msgQueueHead = createNewMsgQueueHead();
     pthread_mutex_t myMutex;
     pthread_mutex_init(&myMutex, 0);
-    while (1) {
+    int threadActive = 1;
+    while (threadActive) {
         pthread_cond_wait(&msgQueueTailChange, &myMutex);
         while (msgQueueHead->head != msgQueueTail) {
-            if (poll(&pfd, 1, -1) < 0)
+            if (poll(&pfd, 1, 3000) < 0)
                 error("ERROR: poll crashed [sender thread]");
             if (pfd.revents & POLLOUT) {
                 int n2 = 0;
@@ -152,7 +158,13 @@ static void* threadSend(void* talkerThreadInfo) {
                 while (n2 < mqe->msgLen) {
                     int n2Delta = send(tti->socketDescriptor, mqe->msg + n2, mqe->msgLen - n2, 0);
                     if (n2Delta == -1) {
-                        //thinking what to do here
+                        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                            threadActive = 0;
+                            pthread_mutex_lock(&msgQueueHead->mutex);
+                            msgQueueHead->used = 0;
+                            pthread_mutex_unlock(&msgQueueHead->mutex);
+                            break;
+                        }
                     }
                     n2 += n2Delta;
                 }
@@ -175,22 +187,28 @@ static void* threadRecv(void* talkerThreadInfo) {
     struct pollfd pfd;
     pfd.fd = tti->socketDescriptor;
     pfd.events = POLLIN;
-    while (1) {
-        if (poll(&pfd, 1, -1) < 0)
+    int threadActive = 1;
+    while (threadActive) {
+        if (poll(&pfd, 1, 3000) < 0)
             error("ERROR: poll crashed [receiver thread]");
         if (pfd.revents & POLLIN) {
             char msg[MAX_CHAT_MSG_LEN];
             int msgLen = recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0);
             if (msgLen > 0) {
-                if (msg[msgLen - 1] != '\n')
+                if (msg[msgLen - 1] != '\n') {
                     while (recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0) > 0);
-                else
+                    if (errno != EAGAIN && errno != EWOULDBLOCK)
+                        threadActive = 0;
+                } else {
                     addToMsgQueue(msg, msgLen);
 #ifdef DEBUG_OUTPUT
                     printf("[Thread: %zu] Received: [", pthread_self());
                     printMyString(msg, msgLen);
                     printf("]\n");
 #endif
+                }
+            } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                threadActive = 0;
             }
         }
     }
