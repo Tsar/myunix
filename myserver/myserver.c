@@ -222,10 +222,10 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
         if (fcntl(acSocketDescriptor, F_SETFL, O_NONBLOCK) < 0)
             error("ERROR: fcntl failed");
 
-        //char cliAddrAsStr[INET6_ADDRSTRLEN];
-        //if (inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN) == NULL)
-        //    error("ERROR: inet_ntop failed");
-        //printf("Connection from <%s>\n", cliAddrAsStr);
+        char cliAddrAsStr[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, (void*)&cliAddr6.sin6_addr, cliAddrAsStr, INET6_ADDRSTRLEN) == NULL)
+            error("ERROR: inet_ntop failed");
+        printf("Connection from <%s>\n", cliAddrAsStr);
 
         TalkerThreadInfo* tti = malloc(sizeof(TalkerThreadInfo));
         tti->socketDescriptor = acSocketDescriptor;
