@@ -199,11 +199,6 @@ static void* threadRecv(void* talkerThreadInfo) {
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
     AcceptorThreadInfo* ati = (AcceptorThreadInfo*)acceptorThreadInfo;
-
-    //temporary disabling IPv6
-    if (ati->ipv6)
-        return;
-
     int socketDescriptor = socket(ati->ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socketDescriptor < 0)
         error("ERROR: Could not create socket");
@@ -220,6 +215,9 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
         servAddr.sin_addr.s_addr = INADDR_ANY;
         servAddr.sin_port = htons(ati->portNumber);
     }
+    int yes = 1;
+    if (/*ati->ipv6 &&*/ setsockopt(socketDescriptor, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) < 0)
+        error("ERROR: setsockopt failed");
     if (bind(socketDescriptor, ati->ipv6 ? (struct sockaddr*)&servAddr6 : (struct sockaddr*)&servAddr, ati->ipv6 ? sizeof(servAddr6) : sizeof(servAddr)) < 0)
         error("ERROR: Could not bind socket");
     if (listen(socketDescriptor, 10) < 0)
