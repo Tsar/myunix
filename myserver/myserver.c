@@ -130,7 +130,6 @@ typedef struct {
 
 typedef struct {
     int portNumber;
-    int ipv6;
     pthread_t threadId;
 } AcceptorThreadInfo;
 
@@ -199,43 +198,34 @@ static void* threadRecv(void* talkerThreadInfo) {
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
     AcceptorThreadInfo* ati = (AcceptorThreadInfo*)acceptorThreadInfo;
-    int socketDescriptor = socket(ati->ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    int socketDescriptor = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     if (socketDescriptor < 0)
         error("ERROR: Could not create socket");
-    struct sockaddr_in servAddr;
     struct sockaddr_in6 servAddr6;
-    if (ati->ipv6) {
-        memset(&servAddr6, 0, sizeof(servAddr6));
-        servAddr6.sin6_family = AF_INET6;
-        servAddr6.sin6_port = htons(ati->portNumber);
-        servAddr6.sin6_addr = in6addr_any;
-    } else {
-        memset(&servAddr, 0, sizeof(servAddr));
-        servAddr.sin_family = AF_INET;
-        servAddr.sin_addr.s_addr = INADDR_ANY;
-        servAddr.sin_port = htons(ati->portNumber);
-    }
-    int yes = 1;
-    if (/*ati->ipv6 &&*/ setsockopt(socketDescriptor, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) < 0)
+    memset(&servAddr6, 0, sizeof(servAddr6));
+    servAddr6.sin6_family = AF_INET6;
+    servAddr6.sin6_port = htons(ati->portNumber);
+    servAddr6.sin6_addr = in6addr_any;
+    int no = 0;
+    if (setsockopt(socketDescriptor, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&no, sizeof(no)) < 0)
         error("ERROR: setsockopt failed");
-    if (bind(socketDescriptor, ati->ipv6 ? (struct sockaddr*)&servAddr6 : (struct sockaddr*)&servAddr, ati->ipv6 ? sizeof(servAddr6) : sizeof(servAddr)) < 0)
+    if (bind(socketDescriptor, (struct sockaddr*)&servAddr6, sizeof(servAddr6)) < 0)
         error("ERROR: Could not bind socket");
     if (listen(socketDescriptor, 10) < 0)
         error("ERROR: Could not start listening on socket");
     while (1) {
-        struct sockaddr_in cliAddr;
         struct sockaddr_in6 cliAddr6;
         socklen_t cliAddrLen;
-        int acSocketDescriptor = accept(socketDescriptor, ati->ipv6 ? (struct sockaddr*)&cliAddr6 : (struct sockaddr*)&cliAddr, &cliAddrLen);
+        int acSocketDescriptor = accept(socketDescriptor, (struct sockaddr*)&cliAddr6, &cliAddrLen);
         if (acSocketDescriptor < 0)
             error("ERROR: Error on accepting");
         if (fcntl(acSocketDescriptor, F_SETFL, O_NONBLOCK) < 0)
             error("ERROR: fcntl failed");
 
-        char cliAddrAsStr[INET6_ADDRSTRLEN];
-        if (inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN) == NULL)
-            error("ERROR: inet_ntop failed");
-        printf("Connection from <%s>\n", cliAddrAsStr);
+        //char cliAddrAsStr[INET6_ADDRSTRLEN];
+        //if (inet_ntop(ati->ipv6 ? AF_INET6 : AF_INET, ati->ipv6 ? (void*)&cliAddr6.sin6_addr : (void*)&cliAddr.sin_addr, cliAddrAsStr, INET6_ADDRSTRLEN) == NULL)
+        //    error("ERROR: inet_ntop failed");
+        //printf("Connection from <%s>\n", cliAddrAsStr);
 
         TalkerThreadInfo* tti = malloc(sizeof(TalkerThreadInfo));
         tti->socketDescriptor = acSocketDescriptor;
@@ -249,14 +239,10 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
 int main(int argc, char* argv[]) {
     initMsgQueue();
     int n = argc - 1;
-    AcceptorThreadInfo* atis = malloc(2 * n * sizeof(AcceptorThreadInfo));
+    AcceptorThreadInfo* atis = malloc(n * sizeof(AcceptorThreadInfo));
     int i;
     for (i = 0; i < n; ++i) {
-        atis[2 * i].portNumber = atis[2 * i + 1].portNumber = atoi(argv[i + 1]);
-        atis[2 * i].ipv6 = 0;
-        atis[2 * i + 1].ipv6 = 1;
-    }
-    for (i = 0; i < 2 * n; ++i) {
+        atis[i].portNumber = atoi(argv[i + 1]);
         if (pthread_create(&atis[i].threadId, NULL, threadAcceptor, (void*)&atis[i]) != 0)
             error("ERROR: Could not create acceptor thread");
     }
