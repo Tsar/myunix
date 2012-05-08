@@ -157,8 +157,7 @@ static void* threadSend(void* talkerThreadInfo) {
     pfd.fd = tti->socketDescriptor;
     pfd.events = POLLOUT;
     MsgQueueHead* msgQueueHead = createNewMsgQueueHead();
-    int threadActive = 1;
-    while (threadActive) {
+    while (1) {
 #ifdef DEBUG_OUTPUT
         printf("[ThreadS: %zu] Waiting condition\n", pthread_self());
 #endif
@@ -178,16 +177,15 @@ static void* threadSend(void* talkerThreadInfo) {
             printf("[ThreadS: %zu] poll POLLOUT ended ok\n", pthread_self());
 #endif
             if (pfd.revents & POLLOUT) {
-                int n2 = 0;
+                int n = 0;
                 MsgQueueElement* mqe = &msgQueueData[msgQueueHead->head];
-                while (n2 < mqe->msgLen) {
+                while (n < mqe->msgLen) {
 #ifdef DEBUG_OUTPUT
                     printf("[ThreadS: %zu] Sending data...\n", pthread_self());
 #endif
-                    int n2Delta = send(tti->socketDescriptor, mqe->msg + n2, mqe->msgLen - n2, 0);
-                    if (n2Delta == -1) {
+                    int nDelta = send(tti->socketDescriptor, mqe->msg + n, mqe->msgLen - n, 0);
+                    if (nDelta == -1) {
                         if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                            threadActive = 0;
                             pthread_mutex_lock(&msgQueueHead->mutex);
                             msgQueueHead->used = 0;
                             pthread_mutex_unlock(&msgQueueHead->mutex);
@@ -197,7 +195,7 @@ static void* threadSend(void* talkerThreadInfo) {
                             return;
                         }
                     }
-                    n2 += n2Delta;
+                    n += nDelta;
                 }
                 pthread_mutex_lock(&msgQueueHead->mutex);
                 msgQueueHead->head = (msgQueueHead->head + 1) % MSG_QUEUE_SIZE;
@@ -220,8 +218,7 @@ static void* threadRecv(void* talkerThreadInfo) {
     struct pollfd pfd;
     pfd.fd = tti->socketDescriptor;
     pfd.events = POLLIN;
-    int threadActive = 1;
-    while (threadActive) {
+    while (1) {
 #ifdef DEBUG_OUTPUT
         printf("[ThreadR: %zu] poll POLLIN\n", pthread_self());
 #endif
@@ -235,28 +232,43 @@ static void* threadRecv(void* talkerThreadInfo) {
             printf("[ThreadR: %zu] Receiving data...\n", pthread_self());
 #endif
             char msg[MAX_CHAT_MSG_LEN];
-            int msgLen = recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0);
-            if (msgLen > 0) {
-                if (msg[msgLen - 1] != '\n') {
-                    while (recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0) > 0);
-                    if (errno != EAGAIN && errno != EWOULDBLOCK)
-                        threadActive = 0;
-                } else {
-                    addToMsgQueue(msg, msgLen);
+            int n = 0;
+            int nDelta = 1;
+            while (nDelta > 0 && n < MAX_CHAT_MSG_LEN) {
+                nDelta = recv(tti->socketDescriptor, msg + n, MAX_CHAT_MSG_LEN - n, 0);
+                if (nDelta > 0) {
+                    int x;
+                    for (x = n; x < n + nDelta; ++x) {
+                        if (msg[x] == '\n') {
+                            addToMsgQueue(msg, x + 1);
 #ifdef DEBUG_OUTPUT
-                    printf("[ThreadR: %zu] Received: [", pthread_self());
-                    printMyString(msg, msgLen);
-                    printf("]\n");
+                            printf("[ThreadR: %zu] Received: [", pthread_self());
+                            printMyString(msg, x + 1);
+                            printf("]\n");
 #endif
+                            nDelta = 0;  //to break from "while"
+                            break;
+                        }
+                    }
+                    n += nDelta;
+                } else {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+#ifdef DEBUG_OUTPUT
+                        printf("[ThreadR: %zu] Exiting\n", pthread_self());
+#endif
+                        return;
+                    }
                 }
-            } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                threadActive = 0;
+            }
+            while (recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0) > 0);
+            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+#ifdef DEBUG_OUTPUT
+                printf("[ThreadR: %zu] Exiting\n", pthread_self());
+#endif
+                return;
             }
         }
     }
-#ifdef DEBUG_OUTPUT
-    printf("[ThreadR: %zu] Exitting\n", pthread_self());
-#endif
 }
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
