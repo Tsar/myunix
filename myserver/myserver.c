@@ -139,6 +139,9 @@ typedef struct {
 } AcceptorThreadInfo;
 
 static void* threadSend(void* talkerThreadInfo) {
+#ifdef DEBUG_OUTPUT
+    printf("[ThreadS: %zu] Started\n", pthread_self());
+#endif
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
     struct pollfd pfd;
     pfd.fd = tti->socketDescriptor;
@@ -148,14 +151,29 @@ static void* threadSend(void* talkerThreadInfo) {
     pthread_mutex_init(&myMutex, 0);
     int threadActive = 1;
     while (threadActive) {
+#ifdef DEBUG_OUTPUT
+        printf("[ThreadS: %zu] Waiting condition \"msgQueueTailChange\"\n", pthread_self());
+#endif
         pthread_cond_wait(&msgQueueTailChange, &myMutex);
+#ifdef DEBUG_OUTPUT
+        printf("[ThreadS: %zu] Condition \"msgQueueTailChange\" happened\n", pthread_self());
+#endif
         while (msgQueueHead->head != msgQueueTail) {
+#ifdef DEBUG_OUTPUT
+            printf("[ThreadS: %zu] poll POLLOUT\n", pthread_self());
+#endif
             if (poll(&pfd, 1, -1) < 0)
                 error("ERROR: poll crashed [sender thread]");
+#ifdef DEBUG_OUTPUT
+            printf("[ThreadS: %zu] poll POLLOUT ended ok\n", pthread_self());
+#endif
             if (pfd.revents & POLLOUT) {
                 int n2 = 0;
                 MsgQueueElement* mqe = &msgQueueData[msgQueueHead->head];
                 while (n2 < mqe->msgLen) {
+#ifdef DEBUG_OUTPUT
+                    printf("[ThreadS: %zu] Sending data...\n", pthread_self());
+#endif
                     int n2Delta = send(tti->socketDescriptor, mqe->msg + n2, mqe->msgLen - n2, 0);
                     if (n2Delta == -1) {
                         if (errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -163,7 +181,9 @@ static void* threadSend(void* talkerThreadInfo) {
                             pthread_mutex_lock(&msgQueueHead->mutex);
                             msgQueueHead->used = 0;
                             pthread_mutex_unlock(&msgQueueHead->mutex);
+#ifdef DEBUG_OUTPUT
                             printf("[ThreadS: %zu] Exitting\n", pthread_self());
+#endif
                             return;
                         }
                     }
@@ -184,15 +204,27 @@ static void* threadSend(void* talkerThreadInfo) {
 }
 
 static void* threadRecv(void* talkerThreadInfo) {
+#ifdef DEBUG_OUTPUT
+    printf("[ThreadR: %zu] Started\n", pthread_self());
+#endif
     TalkerThreadInfo* tti = (TalkerThreadInfo*)talkerThreadInfo;
     struct pollfd pfd;
     pfd.fd = tti->socketDescriptor;
     pfd.events = POLLIN;
     int threadActive = 1;
     while (threadActive) {
+#ifdef DEBUG_OUTPUT
+        printf("[ThreadR: %zu] poll POLLIN\n", pthread_self());
+#endif
         if (poll(&pfd, 1, -1) < 0)
             error("ERROR: poll crashed [receiver thread]");
+#ifdef DEBUG_OUTPUT
+        printf("[ThreadR: %zu] poll POLLIN ended ok\n", pthread_self());
+#endif
         if (pfd.revents & POLLIN) {
+#ifdef DEBUG_OUTPUT
+            printf("[ThreadR: %zu] Receiving data...\n", pthread_self());
+#endif
             char msg[MAX_CHAT_MSG_LEN];
             int msgLen = recv(tti->socketDescriptor, msg, MAX_CHAT_MSG_LEN, 0);
             if (msgLen > 0) {
@@ -213,7 +245,9 @@ static void* threadRecv(void* talkerThreadInfo) {
             }
         }
     }
+#ifdef DEBUG_OUTPUT
     printf("[ThreadR: %zu] Exitting\n", pthread_self());
+#endif
 }
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
