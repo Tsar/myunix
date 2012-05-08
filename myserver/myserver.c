@@ -163,7 +163,8 @@ static void* threadSend(void* talkerThreadInfo) {
                             pthread_mutex_lock(&msgQueueHead->mutex);
                             msgQueueHead->used = 0;
                             pthread_mutex_unlock(&msgQueueHead->mutex);
-                            break;
+                            printf("[ThreadS: %zu] Exitting", pthread_self());
+                            return;
                         }
                     }
                     n2 += n2Delta;
@@ -172,7 +173,7 @@ static void* threadSend(void* talkerThreadInfo) {
                 msgQueueHead->head = (msgQueueHead->head + 1) % MSG_QUEUE_SIZE;
                 pthread_mutex_unlock(&msgQueueHead->mutex);
 #ifdef DEBUG_OUTPUT
-                printf("[Thread: %zu] Sent: [", pthread_self());
+                printf("[ThreadS: %zu] Sent: [", pthread_self());
                 printMyString(mqe->msg, mqe->msgLen);
                 printf("]\n");
 #endif
@@ -202,7 +203,7 @@ static void* threadRecv(void* talkerThreadInfo) {
                 } else {
                     addToMsgQueue(msg, msgLen);
 #ifdef DEBUG_OUTPUT
-                    printf("[Thread: %zu] Received: [", pthread_self());
+                    printf("[ThreadR: %zu] Received: [", pthread_self());
                     printMyString(msg, msgLen);
                     printf("]\n");
 #endif
@@ -212,6 +213,7 @@ static void* threadRecv(void* talkerThreadInfo) {
             }
         }
     }
+    printf("[ThreadR: %zu] Exitting", pthread_self());
 }
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
@@ -233,7 +235,7 @@ static void* threadAcceptor(void* acceptorThreadInfo) {
         error("ERROR: Could not start listening on socket");
     while (1) {
         struct sockaddr_in6 cliAddr6;
-        socklen_t cliAddrLen;
+        socklen_t cliAddrLen = sizeof(cliAddr6);
         int acSocketDescriptor = accept(socketDescriptor, (struct sockaddr*)&cliAddr6, &cliAddrLen);
         if (acSocketDescriptor < 0)
             error("ERROR: Error on accepting");
