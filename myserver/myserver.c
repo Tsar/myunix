@@ -28,6 +28,8 @@ typedef struct {
     int head;
     int used;
     pthread_mutex_t mutex;
+    pthread_cond_t waitCond;
+    pthread_mutex_t waitMutex;
 } MsgQueueHead;
 
 MsgQueueElement msgQueueData[MSG_QUEUE_SIZE];
@@ -36,11 +38,9 @@ MsgQueueHead* msgQueueHeads;
 int msgQueueHeadsCount;
 int msgQueueHeadsCapacity;
 int msgQueueTail;
-pthread_cond_t msgQueueTailChange;
 
 void initMsgQueue() {
     pthread_mutex_init(&msgQueueMutex, 0);
-    pthread_cond_init(&msgQueueTailChange, 0);
     msgQueueTail = 0;
     msgQueueHeadsCount = 0;
     msgQueueHeadsCapacity = 2 * sizeof(MsgQueueHead);
@@ -49,10 +49,12 @@ void initMsgQueue() {
 
 void destroyMsgQueue() {
     int i;
-    for (i = 0; i < msgQueueHeadsCount; ++i)
+    for (i = 0; i < msgQueueHeadsCount; ++i) {
         pthread_mutex_destroy(&msgQueueHeads[i].mutex);
+        pthread_cond_destroy(&msgQueueHeads[i].waitCond);
+        pthread_mutex_destroy(&msgQueueHeads[i].waitMutex);
+    }
     free(msgQueueHeads);
-    pthread_cond_destroy(&msgQueueTailChange);
     pthread_mutex_destroy(&msgQueueMutex);
 }
 
@@ -105,7 +107,13 @@ void addToMsgQueue(const char* msg, int msgLen) {
     printAllQueues();
 #endif
     pthread_mutex_unlock(&msgQueueMutex);
-    pthread_cond_broadcast(&msgQueueTailChange);
+    for (i = 0; i < msgQueueHeadsCount; ++i) {
+        if (msgQueueHeads[i].used) {
+            pthread_mutex_lock(&msgQueueHeads[i].waitMutex);
+            pthread_cond_signal(&msgQueueHeads[i].waitCond);
+            pthread_mutex_unlock(&msgQueueHeads[i].waitMutex);
+        }
+    }
 }
 
 MsgQueueHead* createNewMsgQueueHead() {
@@ -118,6 +126,8 @@ MsgQueueHead* createNewMsgQueueHead() {
     msgQueueHeads[msgQueueHeadsCount - 1].head = msgQueueTail;
     msgQueueHeads[msgQueueHeadsCount - 1].used = 1;
     pthread_mutex_init(&msgQueueHeads[msgQueueHeadsCount - 1].mutex, 0);
+    pthread_cond_init(&msgQueueHeads[msgQueueHeadsCount - 1].waitCond, 0);
+    pthread_mutex_init(&msgQueueHeads[msgQueueHeadsCount - 1].waitMutex, 0);
     pthread_mutex_unlock(&msgQueueMutex);
     return &msgQueueHeads[msgQueueHeadsCount - 1];
 }
@@ -147,16 +157,16 @@ static void* threadSend(void* talkerThreadInfo) {
     pfd.fd = tti->socketDescriptor;
     pfd.events = POLLOUT;
     MsgQueueHead* msgQueueHead = createNewMsgQueueHead();
-    pthread_mutex_t myMutex;
-    pthread_mutex_init(&myMutex, 0);
     int threadActive = 1;
     while (threadActive) {
 #ifdef DEBUG_OUTPUT
-        printf("[ThreadS: %zu] Waiting condition \"msgQueueTailChange\"\n", pthread_self());
+        printf("[ThreadS: %zu] Waiting condition\n", pthread_self());
 #endif
-        pthread_cond_wait(&msgQueueTailChange, &myMutex);
+        pthread_mutex_lock(&msgQueueHead->waitMutex);
+        pthread_cond_wait(&msgQueueHead->waitCond, &msgQueueHead->waitMutex);
+        pthread_mutex_unlock(&msgQueueHead->waitMutex);
 #ifdef DEBUG_OUTPUT
-        printf("[ThreadS: %zu] Condition \"msgQueueTailChange\" happened\n", pthread_self());
+        printf("[ThreadS: %zu] Condition happened\n", pthread_self());
 #endif
         while (msgQueueHead->head != msgQueueTail) {
 #ifdef DEBUG_OUTPUT
@@ -200,7 +210,6 @@ static void* threadSend(void* talkerThreadInfo) {
             }
         }
     }
-    pthread_mutex_destroy(&myMutex);
 }
 
 static void* threadRecv(void* talkerThreadInfo) {
