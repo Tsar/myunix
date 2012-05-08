@@ -17,7 +17,7 @@ void* memcpy(void* destination, const void* source, size_t num);
 #define MAX_CHAT_MSG_LEN  21
 #define MSG_QUEUE_SIZE    10000
 
-#define DEBUG_OUTPUT
+//#define DEBUG_OUTPUT
 
 typedef struct {
     char msg[MAX_CHAT_MSG_LEN];
