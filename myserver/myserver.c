@@ -163,7 +163,7 @@ static void* threadSend(void* talkerThreadInfo) {
                             pthread_mutex_lock(&msgQueueHead->mutex);
                             msgQueueHead->used = 0;
                             pthread_mutex_unlock(&msgQueueHead->mutex);
-                            printf("[ThreadS: %zu] Exitting", pthread_self());
+                            printf("[ThreadS: %zu] Exitting\n", pthread_self());
                             return;
                         }
                     }
@@ -213,7 +213,7 @@ static void* threadRecv(void* talkerThreadInfo) {
             }
         }
     }
-    printf("[ThreadR: %zu] Exitting", pthread_self());
+    printf("[ThreadR: %zu] Exitting\n", pthread_self());
 }
 
 static void* threadAcceptor(void* acceptorThreadInfo) {
