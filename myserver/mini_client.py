@@ -16,7 +16,7 @@ try:
     thread.start_new_thread(threadRecv, (sock,))
     while True:
         s = raw_input("# ")
-        if sock.sendall(s) == None:
+        if sock.sendall(s + "\n") == None:
             print "S: [%s]" % s
 finally:
     sock.close()
