@@ -1,19 +1,22 @@
 import socket
 import sys
+import thread
 
-HOST, PORT = "192.168.1.32", 5689
-data = "message1\n"
+def threadRecv(sock):
+    while True:
+        received = sock.recv(1024)
+        if len(received) > 0:
+            print "R: [%s]" % received
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+if __name__ == "__main__":
+    HOST, PORT = "127.0.0.1", 5689
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
     sock.connect((HOST, PORT))
-    sock.send(data)
-
-    # Receive data from the server and shut down
-    received = sock.recv(1024)
+    thread.start_new_thread(threadRecv, (sock,))
+    while True:
+        s = raw_input("# ")
+        if sock.sendall(s) == None:
+            print "S: [%s]" % s
 finally:
     sock.close()
-
-print "Sent:     {0}".format(data)
-print "Received: {0}".format(received)

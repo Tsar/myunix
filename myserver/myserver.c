@@ -150,7 +150,7 @@ static void* threadSend(void* talkerThreadInfo) {
     while (threadActive) {
         pthread_cond_wait(&msgQueueTailChange, &myMutex);
         while (msgQueueHead->head != msgQueueTail) {
-            if (poll(&pfd, 1, 3000) < 0)
+            if (poll(&pfd, 1, -1) < 0)
                 error("ERROR: poll crashed [sender thread]");
             if (pfd.revents & POLLOUT) {
                 int n2 = 0;
@@ -189,7 +189,7 @@ static void* threadRecv(void* talkerThreadInfo) {
     pfd.events = POLLIN;
     int threadActive = 1;
     while (threadActive) {
-        if (poll(&pfd, 1, 3000) < 0)
+        if (poll(&pfd, 1, -1) < 0)
             error("ERROR: poll crashed [receiver thread]");
         if (pfd.revents & POLLIN) {
             char msg[MAX_CHAT_MSG_LEN];
