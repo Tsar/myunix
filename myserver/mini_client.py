@@ -6,7 +6,7 @@ def threadRecv(sock):
     while True:
         received = sock.recv(1024)
         if len(received) > 0:
-            print "R: [%s]" % received
+            print "R: [%s]" % received[:-1]
 
 if __name__ == "__main__":
     HOST, PORT = "127.0.0.1", 5689
