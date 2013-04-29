@@ -5,7 +5,7 @@ EXECUTABLE=myserver
 all: $(EXECUTABLE)
 
 $(EXECUTABLE): myserver.o
-	$(CC) -lpthread myserver.o -o $@
+	$(CC) myserver.o -lpthread -o $@
 
 myserver.o: myserver.c
 	$(CC) $(CFLAGS) myserver.c
